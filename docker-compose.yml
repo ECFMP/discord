@@ -1,0 +1,10 @@
+version: "3.7"
+services:
+  discord:
+    build:
+      context: .
+      dockerfile: Dockerfile-dev
+    ports:
+      - "80:80"
+    volumes:
+      - .:/app
