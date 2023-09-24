@@ -1,14 +1,8 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.21-alpine AS builder_base
 
-WORKDIR /app
+# Dev container, uses air for hot reloading
+FROM builder_base AS development
 
-COPY go.mod ./
-RUN go mod download
-COPY *.go ./
 RUN go install github.com/cosmtrek/air@latest
-
-RUN go build -o /ecfmp-discord
-
-EXPOSE 80
 
 CMD ["air", "-c", ".air.toml"]

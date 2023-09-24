@@ -4,7 +4,47 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-dev
+      target: development
+    depends_on:
+      - mongodb
+    environment:
+      MONGO_USERNAME: root
+      MONGO_PASSWORD: example_password
+      MONGO_DB: ecfmp
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - .:/app
+
+  go_testing:
+    build:
+      context: .
+      dockerfile: Dockerfile-dev
+      target: builder_base
+    depends_on:
+      - mongodb
+    environment:
+      MONGO_USERNAME: root
+      MONGO_PASSWORD: example_password
+      MONGO_DB: ecfmp
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+    volumes:
+      - .:/app
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-entry/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example_password
+
+volumes:
+  mongodb_data:
