@@ -35,7 +35,7 @@ services:
       - .:/app
 
   mongodb:
-    image: mongo:latest
+    image: mongo:6.0
     container_name: mongodb
     ports:
       - "27017:27017"
