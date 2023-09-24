@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Start containers
-        run: docker-compose -d --build
+        run: docker-compose up -d --build
 
       - name: Run Tests
         run: make test
