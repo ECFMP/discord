@@ -4,7 +4,8 @@ import (
 	"context"
 	db "ecfmp/discord/internal/db"
 	ecfmp_grpc "ecfmp/discord/internal/grpc"
-	pb "ecfmp/discord/proto"
+	pb_discord "ecfmp/discord/proto/discord"
+	pb_health "ecfmp/discord/proto/health"
 	"net"
 	"testing"
 
@@ -38,7 +39,7 @@ func SetupTest(t *testing.T) TestMongo {
 		t.Errorf("Failed to connect to mongo: %v", err)
 	}
 
-	mongo.Client.Database("ecfmp").Collection("discord_messages").Drop(context.Background())
+	mongo.Client.Database("ecfmp_test").Collection("discord_messages").Drop(context.Background())
 
 	// gRPC setup
 	lis = bufconn.Listen(bufSize)
@@ -93,11 +94,11 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 	grpcClient := setupGrpcClient()
 	defer grpcClient.close()
 
-	client := pb.NewDiscordClient(grpcClient.conn)
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
 
 	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
 	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
-	resp, err := client.Create(ctx, &pb.DiscordMessage{Content: "Hello, world!"})
+	resp, err := client.Create(ctx, &pb_discord.DiscordMessage{Content: "Hello, world!"})
 
 	assert.Nil(t, err)
 	responseId := resp.GetId()
@@ -116,13 +117,13 @@ func Test_ItReturnsPrexistingIdIfRequestAlreadyExists(t *testing.T) {
 	grpcClient := setupGrpcClient()
 	defer grpcClient.close()
 
-	client := pb.NewDiscordClient(grpcClient.conn)
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
 
-	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb.DiscordMessage{Content: "Hello, world!"})
+	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.DiscordMessage{Content: "Hello, world!"})
 
 	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
 	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
-	resp, err := client.Create(ctx, &pb.DiscordMessage{Content: "Hello, world!"})
+	resp, err := client.Create(ctx, &pb_discord.DiscordMessage{Content: "Hello, world!"})
 
 	assert.Nil(t, err)
 	responseId := resp.GetId()
@@ -136,9 +137,9 @@ func Test_ItRejectsRequestsThatDontHaveAClientRequestId(t *testing.T) {
 	grpcClient := setupGrpcClient()
 	defer grpcClient.close()
 
-	client := pb.NewDiscordClient(grpcClient.conn)
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
 
-	resp, err := client.Create(context.Background(), &pb.DiscordMessage{Content: "Hello, world!"})
+	resp, err := client.Create(context.Background(), &pb_discord.DiscordMessage{Content: "Hello, world!"})
 	assert.Equal(t, err, status.Error(codes.InvalidArgument, "x-client-request-id metadata is required"))
 	assert.Nil(t, resp)
 }
@@ -150,9 +151,23 @@ func Test_ItRejectsRequestsThatDontHaveContent(t *testing.T) {
 	grpcClient := setupGrpcClient()
 	defer grpcClient.close()
 
-	client := pb.NewDiscordClient(grpcClient.conn)
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
 
-	resp, err := client.Create(context.Background(), &pb.DiscordMessage{})
+	resp, err := client.Create(context.Background(), &pb_discord.DiscordMessage{})
 	assert.Equal(t, err, status.Error(codes.InvalidArgument, "Content is required"))
 	assert.Nil(t, resp)
+}
+
+func Test_ItDoesAHealthCheck(t *testing.T) {
+	mongo := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_health.NewHealthClient(grpcClient.conn)
+
+	resp, err := client.Check(context.Background(), &pb_health.HealthCheckRequest{})
+	assert.Nil(t, err)
+	assert.Equal(t, resp.Status, pb_health.HealthCheckResponse_SERVING)
 }

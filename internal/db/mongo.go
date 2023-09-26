@@ -2,7 +2,7 @@ package db
 
 import (
 	"context"
-	pb "ecfmp/discord/proto"
+	pb "ecfmp/discord/proto/discord"
 	"fmt"
 	"os"
 	"time"
@@ -22,6 +22,7 @@ type DiscordMessage struct {
 
 type Mongo struct {
 	Client *mongo.Client
+	database string
 }
 
 func NewMongo() (*Mongo, error) {
@@ -41,14 +42,16 @@ func NewMongo() (*Mongo, error) {
 		return nil, err
 	}
 
-	err = client.Ping(ctx, nil)
-	if err != nil {
-		log.Errorf("Failed to ping mongo: %v", err)
-		return nil, err
+	// Ping mongo
+	pingErr := client.Ping(ctx, nil)
+	if pingErr != nil {
+		log.Errorf("Failed to ping mongo: %v", pingErr)
+		return nil, pingErr
 	}
 
 	return &Mongo{
 		Client: client,
+		database: os.Getenv("MONGO_DB"),
 	}, nil
 }
 
@@ -56,7 +59,7 @@ func NewMongo() (*Mongo, error) {
  * Write a discord message to the database
  */
 func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.DiscordMessage) (string, error) {
-	collection := m.Client.Database("ecfmp").Collection("discord_messages")
+	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -73,7 +76,7 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.DiscordM
 }
 
 func (m *Mongo) GetDiscordMessageById(id string) (*DiscordMessage, error) {
-	collection := m.Client.Database("ecfmp").Collection("discord_messages")
+	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -100,7 +103,7 @@ func (m *Mongo) GetDiscordMessageById(id string) (*DiscordMessage, error) {
  * Should handle the case where the message is not present without erroring
  */
 func (m *Mongo) GetDiscordMessageByClientRequestId(clientRequestId string) (*DiscordMessage, error) {
-	collection := m.Client.Database("ecfmp").Collection("discord_messages")
+	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -115,6 +118,12 @@ func (m *Mongo) GetDiscordMessageByClientRequestId(clientRequestId string) (*Dis
 	}
 
 	return &result, nil
+}
+
+func (m *Mongo) Ping() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return m.Client.Ping(ctx, nil)
 }
 
 func (m *Mongo) Disconnect() error {

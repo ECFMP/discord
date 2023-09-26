@@ -22,13 +22,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-dev
-      target: builder_base
+      target: testing
     depends_on:
       - mongodb
     environment:
       MONGO_USERNAME: root
       MONGO_PASSWORD: example_password
-      MONGO_DB: ecfmp
+      MONGO_DB: ecfmp_test
       MONGO_HOST: mongodb
       MONGO_PORT: 27017
     volumes:

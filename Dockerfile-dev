@@ -1,8 +1,36 @@
 FROM golang:1.21-alpine AS builder_base
 
+WORKDIR /app
+
+# Install make and protobuf
+RUN apk add --no-cache protobuf make
+
+# Install GRPC health probe
+RUN set -ex \
+    && apk add --no-cache curl \
+    && curl -fSL https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.19/grpc_health_probe-linux-amd64 -o /usr/local/bin/grpc_health_probe \
+    && chmod +x /usr/local/bin/grpc_health_probe
+
+# Create the user
+RUN adduser -u1000 -D appuser
+
+USER appuser
+
+# Install go packages for proto
+RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
+
+FROM builder_base AS testing
+
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 CMD [ "grpc_health_probe", "-addr", "localhost:80", "-connect-timeout", "250ms", "-rpc-timeout", "100ms" ]
+
+ENTRYPOINT [ "./docker/test-container.sh" ]
+
 # Dev container, uses air for hot reloading
 FROM builder_base AS development
 
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 CMD [ "grpc_health_probe", "-addr", "localhost:80", "-connect-timeout", "250ms", "-rpc-timeout", "100ms" ]
+
 RUN go install github.com/cosmtrek/air@latest
 
-CMD ["air", "-c", ".air.toml"]
+ENTRYPOINT ["./docker/dev-container.sh"]

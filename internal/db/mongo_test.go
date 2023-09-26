@@ -3,7 +3,7 @@ package db_test
 import (
 	"context"
 	db "ecfmp/discord/internal/db"
-	pb "ecfmp/discord/proto"
+	pb "ecfmp/discord/proto/discord"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +16,7 @@ func SetupTest(t *testing.T) func(tb testing.TB) {
 		t.Errorf("Failed to connect to mongo: %v", err)
 	}
 
-	mongo.Client.Database("ecfmp").Collection("discord_messages").Drop(context.Background())
+	mongo.Client.Database("ecfmp_test").Collection("discord_messages").Drop(context.Background())
 
 	return func(tb testing.TB) {
 		mongo.Client.Disconnect(context.Background())
@@ -42,7 +42,7 @@ func Test_ItWritesADiscordMessage(t *testing.T) {
 
 	// Check the database
 	var result db.DiscordMessage
-	err = mongo.Client.Database("ecfmp").Collection("discord").FindOne(nil, map[string]string{"client_request_id": "1"}).Decode(&result)
+	err = mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), map[string]string{"client_request_id": "1"}).Decode(&result)
 	assert.Nil(t, err)
 	assert.Equal(t, "1", result.ClientRequestId)
 	assert.Equal(t, "Hello World!", result.Content)

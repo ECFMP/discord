@@ -3,7 +3,8 @@ package grpc
 import (
 	"context"
 	db "ecfmp/discord/internal/db"
-	pb "ecfmp/discord/proto"
+	pb_discord "ecfmp/discord/proto/discord"
+	pb_health "ecfmp/discord/proto/health"
 	"net"
 
 	log "github.com/sirupsen/logrus"
@@ -15,7 +16,8 @@ import (
 
 // server is used to implement helloworld.GreeterServer.
 type server struct {
-	pb.UnimplementedDiscordServer
+	pb_health.UnimplementedHealthServer
+	pb_discord.UnimplementedDiscordServer
 	server *grpc.Server
 	mongo  *db.Mongo
 }
@@ -30,7 +32,7 @@ func (server *server) Serve(listener net.Listener) error {
 /**
  * Implements the Create method of the DiscordServer interface
  */
-func (server *server) Create(ctx context.Context, in *pb.DiscordMessage) (*pb.CreateResponse, error) {
+func (server *server) Create(ctx context.Context, in *pb_discord.DiscordMessage) (*pb_discord.CreateResponse, error) {
 	if in.GetContent() == "" {
 		log.Warning("Invalid request: Content is required")
 		return nil, status.Error(codes.InvalidArgument, "Content is required")
@@ -57,7 +59,7 @@ func (server *server) Create(ctx context.Context, in *pb.DiscordMessage) (*pb.Cr
 
 	if existingId != nil && existingId.ClientRequestId != "" {
 		log.Infof("Discord message already exists: %v", existingId.ClientRequestId)
-		return &pb.CreateResponse{Id: existingId.Id}, nil
+		return &pb_discord.CreateResponse{Id: existingId.Id}, nil
 	}
 
 	// Write the message to the database
@@ -69,7 +71,20 @@ func (server *server) Create(ctx context.Context, in *pb.DiscordMessage) (*pb.Cr
 
 	log.Infof("Written discord message %v", mongoId)
 
-	return &pb.CreateResponse{Id: mongoId}, nil
+	return &pb_discord.CreateResponse{Id: mongoId}, nil
+}
+
+/**
+ * Implements the Check method of the HealthServer interface
+ */
+func (server *server) Check(ctx context.Context, in *pb_health.HealthCheckRequest) (*pb_health.HealthCheckResponse, error) {
+	mongoPingErr := server.mongo.Ping()
+	if mongoPingErr != nil {
+		log.Errorf("Failed to ping mongo: %v", mongoPingErr)
+		return nil, status.Error(codes.Unavailable, "Failed to ping mongo")
+	}
+
+	return &pb_health.HealthCheckResponse{Status: pb_health.HealthCheckResponse_SERVING}, nil
 }
 
 /**
@@ -78,7 +93,8 @@ func (server *server) Create(ctx context.Context, in *pb.DiscordMessage) (*pb.Cr
 func NewServer(mongo *db.Mongo) *server {
 	s := grpc.NewServer()
 	server := &server{mongo: mongo, server: s}
-	pb.RegisterDiscordServer(s, server)
+	pb_discord.RegisterDiscordServer(s, server)
+	pb_health.RegisterHealthServer(s, server)
 
 	return server
 }
