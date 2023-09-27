@@ -18,10 +18,21 @@ type DiscordMessage struct {
 	Id              string `bson:"_id,omitempty"`
 	ClientRequestId string `bson:"client_request_id"`
 	Content         string `bson:"content"`
+	LastClientRequestPublished string `bson:"last_client_request_published"`
 }
 
+// THOUGHTS:
+// When a message is sent for the first time, it will have a client request id, we also generate another id
+// On updates, we publish the latest for that id
+// We probably also want a log of all the client requests that have been published
+// So we have a structure of id, last_client_request_published, versions (client_request_id, content, timestamp)
+// On insert/update, we check that we dont have duplicate client request id, if we do, we don't do anything
+// Once we've done the update, we put the client request id onto a queue for publishing
+// At publish time, we publish the latest version for each id and update the last_client_request_published
+// If there's a race of two updates for the same id, we'll just publish the latest one (and ignore the next job when it comes)
+
 type Mongo struct {
-	Client *mongo.Client
+	Client   *mongo.Client
 	database string
 }
 
@@ -49,8 +60,25 @@ func NewMongo() (*Mongo, error) {
 		return nil, pingErr
 	}
 
+	// Create necessary indexes in mongo
+	collection := client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages")
+	_, indexErr := collection.Indexes().CreateOne(
+		context.Background(),
+		mongo.IndexModel{
+			Keys: bson.M{
+				"client_request_id": 1,
+			},
+			Options: options.Index().SetUnique(true).SetName("client_request_id"),
+		},
+	)
+
+	if indexErr != nil {
+		log.Errorf("Failed to create index: %v", indexErr)
+		return nil, indexErr
+	}
+
 	return &Mongo{
-		Client: client,
+		Client:   client,
 		database: os.Getenv("MONGO_DB"),
 	}, nil
 }
