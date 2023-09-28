@@ -14,11 +14,15 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type DiscordMessage struct {
-	Id              string `bson:"_id,omitempty"`
+type DiscordMessageVersion struct {
 	ClientRequestId string `bson:"client_request_id"`
 	Content         string `bson:"content"`
+}
+
+type DiscordMessage struct {
+	Id              string `bson:"_id,omitempty"`
 	LastClientRequestPublished string `bson:"last_client_request_published"`
+	Versions []DiscordMessageVersion `bson:"versions"`
 }
 
 // THOUGHTS:
@@ -66,9 +70,9 @@ func NewMongo() (*Mongo, error) {
 		context.Background(),
 		mongo.IndexModel{
 			Keys: bson.M{
-				"client_request_id": 1,
+				"versions.client_request_id": 1,
 			},
-			Options: options.Index().SetUnique(true).SetName("client_request_id"),
+			Options: options.Index().SetUnique(true).SetName("versions_client_request_id"),
 		},
 	)
 
@@ -91,9 +95,12 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.DiscordM
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	record := DiscordMessage{
+	version := DiscordMessageVersion{
 		ClientRequestId: clientRequestId,
-		Content:         message.Content,
+		Content: message.Content,
+	}
+	record := DiscordMessage{
+		Versions: []DiscordMessageVersion{version},
 	}
 	res, err := collection.InsertOne(ctx, record)
 	if err != nil {
@@ -136,7 +143,7 @@ func (m *Mongo) GetDiscordMessageByClientRequestId(clientRequestId string) (*Dis
 	defer cancel()
 
 	var result DiscordMessage
-	err := collection.FindOne(ctx, bson.M{"client_request_id": clientRequestId}).Decode(&result)
+	err := collection.FindOne(ctx, bson.M{"versions.client_request_id": clientRequestId}).Decode(&result)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return nil, err
 	}

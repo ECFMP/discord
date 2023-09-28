@@ -51,19 +51,20 @@ func (server *server) Create(ctx context.Context, in *pb_discord.DiscordMessage)
 	}
 
 	// Check if the message has already been written, and return the existing id if so
-	existingId, err := server.mongo.GetDiscordMessageByClientRequestId(metadata.Get("x-client-request-id")[0])
+	clientRequestId := metadata.Get("x-client-request-id")[0]
+	existingId, err := server.mongo.GetDiscordMessageByClientRequestId(clientRequestId)
 	if err != nil {
 		log.Errorf("Failed to get discord message by client request id: %v", err)
 		return nil, status.Error(codes.Internal, "Failed to get discord message")
 	}
 
-	if existingId != nil && existingId.ClientRequestId != "" {
-		log.Infof("Discord message already exists: %v", existingId.ClientRequestId)
+	if existingId != nil {
+		log.Infof("Discord message already exists: %v", clientRequestId)
 		return &pb_discord.CreateResponse{Id: existingId.Id}, nil
 	}
 
 	// Write the message to the database
-	mongoId, err := server.mongo.WriteDiscordMessage(metadata.Get("x-client-request-id")[0], in)
+	mongoId, err := server.mongo.WriteDiscordMessage(clientRequestId, in)
 	if err != nil {
 		log.Errorf("Failed to write discord message: %v", err)
 		return nil, status.Error(codes.Internal, "Failed to create discord message")

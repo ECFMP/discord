@@ -105,9 +105,10 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 	mongoMessage, err := mongo.client.GetDiscordMessageById(responseId)
 
 	assert.Nil(t, err)
-	assert.Equal(t, "Hello, world!", mongoMessage.Content)
 	assert.Equal(t, responseId, mongoMessage.Id)
-	assert.Equal(t, "my-client-request-id", mongoMessage.ClientRequestId)
+	assert.Equal(t, 1, len(mongoMessage.Versions))
+	assert.Equal(t, "my-client-request-id", mongoMessage.Versions[0].ClientRequestId)
+	assert.Equal(t, "Hello, world!", mongoMessage.Versions[0].Content)
 }
 
 func Test_ItReturnsPrexistingIdIfRequestAlreadyExists(t *testing.T) {

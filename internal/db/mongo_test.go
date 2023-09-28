@@ -42,10 +42,11 @@ func Test_ItWritesADiscordMessage(t *testing.T) {
 
 	// Check the database
 	var result db.DiscordMessage
-	err = mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), map[string]string{"client_request_id": "1"}).Decode(&result)
+	err = mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), map[string]string{"versions.client_request_id": "1"}).Decode(&result)
 	assert.Nil(t, err)
-	assert.Equal(t, "1", result.ClientRequestId)
-	assert.Equal(t, "Hello World!", result.Content)
+	assert.Equal(t, 1, len(result.Versions))
+	assert.Equal(t, "1", result.Versions[0].ClientRequestId)
+	assert.Equal(t, "Hello World!", result.Versions[0].Content)
 }
 
 func Test_ItGetsDiscordMessageByClientRequestId(t *testing.T) {
@@ -65,7 +66,9 @@ func Test_ItGetsDiscordMessageByClientRequestId(t *testing.T) {
 	message, requestErr := mongo.GetDiscordMessageByClientRequestId("1")
 	assert.Nil(t, requestErr)
 	assert.Equal(t, messageId, message.Id)
-	assert.Equal(t, "1", message.ClientRequestId)
+	assert.Equal(t, 1, len(message.Versions))
+	assert.Equal(t, "1", message.Versions[0].ClientRequestId)
+	assert.Equal(t, "Hello World!", message.Versions[0].Content)
 }
 
 func Test_ItDoesntFindMessageByClientRequestId(t *testing.T) {
