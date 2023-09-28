@@ -110,6 +110,33 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.CreateRe
 	return res.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
+func (m *Mongo) PublishMessageVersion(clientRequestId string, message *pb.UpdateRequest) (error) {
+	collection := m.Client.Database(m.database).Collection("discord_messages")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	objectId, idErr := primitive.ObjectIDFromHex(message.Id)
+	if idErr != nil {
+		return idErr
+	}
+
+	// Update the message
+	version := DiscordMessageVersion{
+		ClientRequestId: clientRequestId,
+		Content: message.Content,
+	}
+	updateCount, err := collection.UpdateByID(ctx, objectId, bson.M{"$push": bson.M{"versions": version}})
+	if err != nil {
+		return err
+	}
+
+	if updateCount.ModifiedCount != 1 {
+		return fmt.Errorf("message not found")
+	}
+
+	return nil
+}
+
 func (m *Mongo) GetDiscordMessageById(id string) (*DiscordMessage, error) {
 	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

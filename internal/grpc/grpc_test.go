@@ -145,6 +145,22 @@ func Test_ItRejectsRequestsThatDontHaveAClientRequestId(t *testing.T) {
 	assert.Nil(t, resp)
 }
 
+func Test_ItRejectsRequestsThatHaveAnEmptyClientRequestId(t *testing.T) {
+	mongo := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Create(ctx, &pb_discord.CreateRequest{Content: "Hello, world!"})
+	assert.Equal(t, err, status.Error(codes.InvalidArgument, "x-client-request-id metadata is required"))
+	assert.Nil(t, resp)
+}
+
 func Test_ItRejectsRequestsThatDontHaveContent(t *testing.T) {
 	mongo := SetupTest(t)
 	defer mongo.tearDown()
@@ -171,4 +187,87 @@ func Test_ItDoesAHealthCheck(t *testing.T) {
 	resp, err := client.Check(context.Background(), &pb_health.HealthCheckRequest{})
 	assert.Nil(t, err)
 	assert.Equal(t, resp.Status, pb_health.HealthCheckResponse_SERVING)
+}
+
+func Test_ItUpdatesAMessage(t *testing.T) {
+	mongo := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id-2")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	_, err := client.Update(ctx, &pb_discord.UpdateRequest{Id: mongoId, Content: "Hello, world, again!"})
+
+	assert.Nil(t, err)
+
+	// Then
+	mongoMessage, err := mongo.client.GetDiscordMessageById(mongoId)
+	assert.Nil(t, err)
+	assert.Equal(t, mongoId, mongoMessage.Id)
+	assert.Equal(t, 2, len(mongoMessage.Versions))
+	assert.Equal(t, "my-client-request-id", mongoMessage.Versions[0].ClientRequestId)
+	assert.Equal(t, "Hello, world!", mongoMessage.Versions[0].Content)
+	assert.Equal(t, "my-client-request-id-2", mongoMessage.Versions[1].ClientRequestId)
+	assert.Equal(t, "Hello, world, again!", mongoMessage.Versions[1].Content)
+}
+
+func Test_ItDoesntUpdateAMessageNotFound(t *testing.T) {
+	mongo := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id-2")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	_, err := client.Update(ctx, &pb_discord.UpdateRequest{Id: "65106dab41199f298668474f", Content: "Hello, world, again!"})
+
+	assert.NotNil(t, err)
+	assert.Equal(t, status.Error(codes.NotFound, codes.NotFound.String()), err)
+}
+
+func Test_ItDoesntUpdateAMessageClientRequestIdEmpty(t *testing.T) {
+	mongo := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	_, err := client.Update(ctx, &pb_discord.UpdateRequest{Id: "65106dab41199f298668474f", Content: "Hello, world, again!"})
+
+	assert.NotNil(t, err)
+	assert.Equal(t, status.Error(codes.InvalidArgument, "x-client-request-id metadata is required"), err)
+}
+
+func Test_ItDoesntUpdateAMessageClientRequestIdMissing(t *testing.T) {
+	mongo := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	_, err := client.Update(context.Background(), &pb_discord.UpdateRequest{Id: "65106dab41199f298668474f", Content: "Hello, world, again!"})
+
+	assert.NotNil(t, err)
+	assert.Equal(t, status.Error(codes.InvalidArgument, "x-client-request-id metadata is required"), err)
 }

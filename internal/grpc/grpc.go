@@ -5,6 +5,7 @@ import (
 	db "ecfmp/discord/internal/db"
 	pb_discord "ecfmp/discord/proto/discord"
 	pb_health "ecfmp/discord/proto/health"
+	"fmt"
 	"net"
 
 	log "github.com/sirupsen/logrus"
@@ -29,6 +30,27 @@ func (server *server) Serve(listener net.Listener) error {
 	return server.server.Serve(listener)
 }
 
+func getClientRequestId(ctx context.Context) (string, error) {
+	metadata, ok := metadata.FromIncomingContext(ctx)
+
+	if !ok {
+		log.Error("Failed to get metadata")
+		return "", fmt.Errorf("failed to get metadata from context")
+	}
+
+	if len(metadata.Get("x-client-request-id")) != 1 {
+		log.Warning("Invalid request: x-client-request-id is required")
+		return "", fmt.Errorf("x-client-request-id metadata is required")
+	}
+
+	if metadata.Get("x-client-request-id")[0] == "" {
+		log.Warning("Invalid request: x-client-request-id is empty")
+		return "", fmt.Errorf("x-client-request-id metadata is required")
+	}
+
+	return metadata.Get("x-client-request-id")[0], nil
+}
+
 /**
  * Implements the Create method of the DiscordServer interface
  */
@@ -38,20 +60,12 @@ func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) 
 		return nil, status.Error(codes.InvalidArgument, "Content is required")
 	}
 
-	metadata, ok := metadata.FromIncomingContext(ctx)
-
-	if !ok {
-		log.Error("Failed to get metadata")
-		return nil, status.Error(codes.Internal, "Failed to get metadata from context")
-	}
-
-	if len(metadata.Get("x-client-request-id")) != 1 {
-		log.Warning("Invalid request: x-client-request-id is required")
-		return nil, status.Error(codes.InvalidArgument, "x-client-request-id metadata is required")
-	}
-
 	// Check if the message has already been written, and return the existing id if so
-	clientRequestId := metadata.Get("x-client-request-id")[0]
+	clientRequestId, requestIdErr := getClientRequestId(ctx)
+	if requestIdErr != nil {
+		return nil, status.Error(codes.InvalidArgument, requestIdErr.Error())
+	}
+
 	existingId, err := server.mongo.GetDiscordMessageByClientRequestId(clientRequestId)
 	if err != nil {
 		log.Errorf("Failed to get discord message by client request id: %v", err)
@@ -73,6 +87,35 @@ func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) 
 	log.Infof("Written discord message %v", mongoId)
 
 	return &pb_discord.CreateResponse{Id: mongoId}, nil
+}
+
+/**
+ * Implements the UpdateMessage of the DiscordServer proto
+ */
+func (server *server) Update(ctx context.Context, in *pb_discord.UpdateRequest) (*pb_discord.UpdateResponse, error) {
+	if in.GetContent() == "" {
+		log.Warning("Invalid request: Content is required")
+		return nil, status.Error(codes.InvalidArgument, "Content is required")
+	}
+
+	// Check if the message has already been written, and return the existing id if so
+	clientRequestId, requestIdErr := getClientRequestId(ctx)
+	if requestIdErr != nil {
+		return nil, status.Error(codes.InvalidArgument, requestIdErr.Error())
+	}
+
+	mongoErr := server.mongo.PublishMessageVersion(clientRequestId, in)
+	if mongoErr != nil && mongoErr.Error() == "message not found" {
+		log.Warning("Invalid request: message not found")
+		return nil, status.Error(codes.NotFound, codes.NotFound.String())
+	}
+
+	if mongoErr != nil {
+		log.Errorf("Failed to update message: %v", mongoErr)
+		return nil, status.Error(codes.Internal, "Failed to update message")
+	}
+
+	return &pb_discord.UpdateResponse{}, nil
 }
 
 /**

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func SetupTest(t *testing.T) func(tb testing.TB) {
@@ -126,4 +128,81 @@ func Test_ItDoesntFindMessageById(t *testing.T) {
 	message, requestErr := mongo.GetDiscordMessageById("65106dab41199f298668474f")
 	assert.Nil(t, requestErr)
 	assert.Nil(t, message)
+}
+
+func Test_ItReturnsErrorFindingBadId(t *testing.T) {
+	teardown := SetupTest(t)
+	defer teardown(t)
+
+	// Given
+	mongo, err := db.NewMongo()
+	if err != nil {
+		t.Errorf("Failed to connect to mongo: %v", err)
+	}
+
+	// When
+	mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
+
+	// Then
+	_, requestErr := mongo.GetDiscordMessageById("abc")
+	assert.Equal(t, "the provided hex string is not a valid ObjectID", requestErr.Error())
+}
+
+func Test_ItUpdatesMessageById(t *testing.T) {
+	teardown := SetupTest(t)
+	defer teardown(t)
+
+	// Given
+	mongo, err := db.NewMongo()
+	if err != nil {
+		t.Errorf("Failed to connect to mongo: %v", err)
+	}
+
+	// When
+	id, _ := mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
+	publishErr := mongo.PublishMessageVersion("another-request-id", &pb.UpdateRequest{Id: id, Content: "Hello Go!"})
+	assert.Nil(t, publishErr)
+
+	// Then
+	objectId, _ := primitive.ObjectIDFromHex(id)
+	var result db.DiscordMessage
+	err = mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&result)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(result.Versions))
+	assert.Equal(t, "1", result.Versions[0].ClientRequestId)
+	assert.Equal(t, "Hello World!", result.Versions[0].Content)
+	assert.Equal(t, "another-request-id", result.Versions[1].ClientRequestId)
+	assert.Equal(t, "Hello Go!", result.Versions[1].Content)
+}
+
+func Test_ItReturnsErrorUpdatingNonExistentMessage(t *testing.T) {
+	teardown := SetupTest(t)
+	defer teardown(t)
+
+	// Given
+	mongo, err := db.NewMongo()
+	if err != nil {
+		t.Errorf("Failed to connect to mongo: %v", err)
+	}
+
+	// When
+	mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
+	publishErr := mongo.PublishMessageVersion("another-request-id", &pb.UpdateRequest{Id: "65106dab41199f298668474f", Content: "Hello Go!"})
+	assert.Equal(t, "message not found", publishErr.Error())
+}
+
+func Test_ItReturnsErrorUpdatingBadId(t *testing.T) {
+	teardown := SetupTest(t)
+	defer teardown(t)
+
+	// Given
+	mongo, err := db.NewMongo()
+	if err != nil {
+		t.Errorf("Failed to connect to mongo: %v", err)
+	}
+
+	// When
+	mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
+	publishErr := mongo.PublishMessageVersion("another-request-id", &pb.UpdateRequest{Id: "abc", Content: "Hello Go!"})
+	assert.Equal(t, "the provided hex string is not a valid ObjectID", publishErr.Error())
 }
