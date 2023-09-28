@@ -98,7 +98,7 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 
 	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
 	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
-	resp, err := client.Create(ctx, &pb_discord.DiscordMessage{Content: "Hello, world!"})
+	resp, err := client.Create(ctx, &pb_discord.CreateRequest{Content: "Hello, world!"})
 
 	assert.Nil(t, err)
 	responseId := resp.GetId()
@@ -120,11 +120,11 @@ func Test_ItReturnsPrexistingIdIfRequestAlreadyExists(t *testing.T) {
 
 	client := pb_discord.NewDiscordClient(grpcClient.conn)
 
-	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.DiscordMessage{Content: "Hello, world!"})
+	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
 
 	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
 	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
-	resp, err := client.Create(ctx, &pb_discord.DiscordMessage{Content: "Hello, world!"})
+	resp, err := client.Create(ctx, &pb_discord.CreateRequest{Content: "Hello, world!"})
 
 	assert.Nil(t, err)
 	responseId := resp.GetId()
@@ -140,7 +140,7 @@ func Test_ItRejectsRequestsThatDontHaveAClientRequestId(t *testing.T) {
 
 	client := pb_discord.NewDiscordClient(grpcClient.conn)
 
-	resp, err := client.Create(context.Background(), &pb_discord.DiscordMessage{Content: "Hello, world!"})
+	resp, err := client.Create(context.Background(), &pb_discord.CreateRequest{Content: "Hello, world!"})
 	assert.Equal(t, err, status.Error(codes.InvalidArgument, "x-client-request-id metadata is required"))
 	assert.Nil(t, resp)
 }
@@ -154,7 +154,7 @@ func Test_ItRejectsRequestsThatDontHaveContent(t *testing.T) {
 
 	client := pb_discord.NewDiscordClient(grpcClient.conn)
 
-	resp, err := client.Create(context.Background(), &pb_discord.DiscordMessage{})
+	resp, err := client.Create(context.Background(), &pb_discord.CreateRequest{})
 	assert.Equal(t, err, status.Error(codes.InvalidArgument, "Content is required"))
 	assert.Nil(t, resp)
 }

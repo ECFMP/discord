@@ -32,7 +32,7 @@ func (server *server) Serve(listener net.Listener) error {
 /**
  * Implements the Create method of the DiscordServer interface
  */
-func (server *server) Create(ctx context.Context, in *pb_discord.DiscordMessage) (*pb_discord.CreateResponse, error) {
+func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) (*pb_discord.CreateResponse, error) {
 	if in.GetContent() == "" {
 		log.Warning("Invalid request: Content is required")
 		return nil, status.Error(codes.InvalidArgument, "Content is required")

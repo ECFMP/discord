@@ -90,7 +90,7 @@ func NewMongo() (*Mongo, error) {
 /**
  * Write a discord message to the database
  */
-func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.DiscordMessage) (string, error) {
+func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.CreateRequest) (string, error) {
 	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -34,7 +34,7 @@ func Test_ItWritesADiscordMessage(t *testing.T) {
 	}
 
 	// When
-	id, err := mongo.WriteDiscordMessage("1", &pb.DiscordMessage{Content: "Hello World!"})
+	id, err := mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
 
 	// Then
 	assert.Nil(t, err)
@@ -60,7 +60,7 @@ func Test_ItGetsDiscordMessageByClientRequestId(t *testing.T) {
 	}
 
 	// When
-	messageId, _ := mongo.WriteDiscordMessage("1", &pb.DiscordMessage{Content: "Hello World!"})
+	messageId, _ := mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
 
 	// Then
 	message, requestErr := mongo.GetDiscordMessageByClientRequestId("1")
@@ -82,7 +82,7 @@ func Test_ItDoesntFindMessageByClientRequestId(t *testing.T) {
 	}
 
 	// When
-	mongo.WriteDiscordMessage("1", &pb.DiscordMessage{Content: "Hello World!"})
+	mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
 
 	// Then
 	message, requestErr := mongo.GetDiscordMessageByClientRequestId("2")
@@ -101,7 +101,7 @@ func Test_ItGetsDiscordMessageById(t *testing.T) {
 	}
 
 	// When
-	messageId, _ := mongo.WriteDiscordMessage("1", &pb.DiscordMessage{Content: "Hello World!"})
+	messageId, _ := mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
 
 	// Then
 	message, requestErr := mongo.GetDiscordMessageById(messageId)
@@ -120,7 +120,7 @@ func Test_ItDoesntFindMessageById(t *testing.T) {
 	}
 
 	// When
-	mongo.WriteDiscordMessage("1", &pb.DiscordMessage{Content: "Hello World!"})
+	mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
 
 	// Then
 	message, requestErr := mongo.GetDiscordMessageById("65106dab41199f298668474f")
