@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	db "ecfmp/discord/internal/db"
+	"ecfmp/discord/internal/discord"
 	pb_discord "ecfmp/discord/proto/discord"
 	pb_health "ecfmp/discord/proto/health"
 	"fmt"
@@ -21,6 +22,7 @@ type server struct {
 	pb_discord.UnimplementedDiscordServer
 	server *grpc.Server
 	mongo  *db.Mongo
+	scheduler discord.Scheduler
 }
 
 /**
@@ -84,8 +86,11 @@ func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) 
 		return nil, status.Error(codes.Internal, "Failed to create discord message")
 	}
 
-	log.Infof("Written discord message %v", mongoId)
+	// Schedule the message to be published
+	server.scheduler.ScheduleMessage(mongoId)
 
+
+	log.Infof("Written discord message %v", mongoId)
 	return &pb_discord.CreateResponse{Id: mongoId}, nil
 }
 
@@ -115,6 +120,9 @@ func (server *server) Update(ctx context.Context, in *pb_discord.UpdateRequest) 
 		return nil, status.Error(codes.Internal, "Failed to update message")
 	}
 
+	// Schedule the message update to be published
+	server.scheduler.ScheduleMessage(in.Id)
+
 	return &pb_discord.UpdateResponse{}, nil
 }
 
@@ -134,9 +142,9 @@ func (server *server) Check(ctx context.Context, in *pb_health.HealthCheckReques
 /**
  * Start the gRPC server
  */
-func NewServer(mongo *db.Mongo) *server {
+func NewServer(mongo *db.Mongo, scheduler discord.Scheduler) *server {
 	s := grpc.NewServer()
-	server := &server{mongo: mongo, server: s}
+	server := &server{mongo: mongo, server: s, scheduler: scheduler}
 	pb_discord.RegisterDiscordServer(s, server)
 	pb_health.RegisterHealthServer(s, server)
 

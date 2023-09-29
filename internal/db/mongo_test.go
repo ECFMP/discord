@@ -206,3 +206,54 @@ func Test_ItReturnsErrorUpdatingBadId(t *testing.T) {
 	publishErr := mongo.PublishMessageVersion("another-request-id", &pb.UpdateRequest{Id: "abc", Content: "Hello Go!"})
 	assert.Equal(t, "the provided hex string is not a valid ObjectID", publishErr.Error())
 }
+
+func Test_ItUpdatesAMessageWithDiscordIdAndPublishedId(t *testing.T) {
+	teardown := SetupTest(t)
+	defer teardown(t)
+
+	// Given
+	mongo, mongoErr := db.NewMongo()
+	if mongoErr != nil {
+		t.Errorf("Failed to connect to mongo: %v", mongoErr)
+	}
+
+	// When
+	id, _ := mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
+	publishErr := mongo.PublishMessageVersion("another-request-id", &pb.UpdateRequest{Id: id, Content: "Hello Go!"})
+	assert.Nil(t, publishErr)
+	updateErr := mongo.UpdateMessageWithDiscordIdAndLastPublishRequest(id, "discord-id", "another-request-id")
+	assert.Nil(t, updateErr)
+
+	// Then
+	objectId, _ := primitive.ObjectIDFromHex(id)
+	var result db.DiscordMessage
+	err := mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&result)
+	assert.Nil(t, err)
+	assert.Equal(t, "discord-id", result.DiscordId)
+	assert.Equal(t, "another-request-id", result.LastClientRequestPublished)
+}
+
+func Test_ItUpdatesAMessageWithPublishedId(t *testing.T) {
+	teardown := SetupTest(t)
+	defer teardown(t)
+
+	// Given
+	mongo, mongoErr := db.NewMongo()
+	if mongoErr != nil {
+		t.Errorf("Failed to connect to mongo: %v", mongoErr)
+	}
+
+	// When
+	id, _ := mongo.WriteDiscordMessage("1", &pb.CreateRequest{Content: "Hello World!"})
+	publishErr := mongo.PublishMessageVersion("another-request-id", &pb.UpdateRequest{Id: id, Content: "Hello Go!"})
+	assert.Nil(t, publishErr)
+	updateErr := mongo.UpdateMessageWithLastPublishRequest(id, "another-request-id")
+	assert.Nil(t, updateErr)
+
+	// Then
+	objectId, _ := primitive.ObjectIDFromHex(id)
+	var result db.DiscordMessage
+	err := mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&result)
+	assert.Nil(t, err)
+	assert.Equal(t, "another-request-id", result.LastClientRequestPublished)
+}

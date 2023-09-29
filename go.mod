@@ -10,7 +10,10 @@ require (
 	google.golang.org/protobuf v1.31.0
 )
 
+require github.com/gorilla/websocket v1.4.2 // indirect
+
 require (
+	github.com/bwmarrin/discordgo v0.27.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.1 // indirect

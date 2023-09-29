@@ -20,20 +20,11 @@ type DiscordMessageVersion struct {
 }
 
 type DiscordMessage struct {
-	Id              string `bson:"_id,omitempty"`
-	LastClientRequestPublished string `bson:"last_client_request_published"`
-	Versions []DiscordMessageVersion `bson:"versions"`
+	Id                         string                  `bson:"_id,omitempty"`
+	DiscordId                  string                  `bson:"discord_id"`
+	LastClientRequestPublished string                  `bson:"last_client_request_published"`
+	Versions                   []DiscordMessageVersion `bson:"versions"`
 }
-
-// THOUGHTS:
-// When a message is sent for the first time, it will have a client request id, we also generate another id
-// On updates, we publish the latest for that id
-// We probably also want a log of all the client requests that have been published
-// So we have a structure of id, last_client_request_published, versions (client_request_id, content, timestamp)
-// On insert/update, we check that we dont have duplicate client request id, if we do, we don't do anything
-// Once we've done the update, we put the client request id onto a queue for publishing
-// At publish time, we publish the latest version for each id and update the last_client_request_published
-// If there's a race of two updates for the same id, we'll just publish the latest one (and ignore the next job when it comes)
 
 type Mongo struct {
 	Client   *mongo.Client
@@ -97,7 +88,7 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.CreateRe
 
 	version := DiscordMessageVersion{
 		ClientRequestId: clientRequestId,
-		Content: message.Content,
+		Content:         message.Content,
 	}
 	record := DiscordMessage{
 		Versions: []DiscordMessageVersion{version},
@@ -110,7 +101,7 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.CreateRe
 	return res.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
-func (m *Mongo) PublishMessageVersion(clientRequestId string, message *pb.UpdateRequest) (error) {
+func (m *Mongo) PublishMessageVersion(clientRequestId string, message *pb.UpdateRequest) error {
 	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -123,7 +114,7 @@ func (m *Mongo) PublishMessageVersion(clientRequestId string, message *pb.Update
 	// Update the message
 	version := DiscordMessageVersion{
 		ClientRequestId: clientRequestId,
-		Content: message.Content,
+		Content:         message.Content,
 	}
 	updateCount, err := collection.UpdateByID(ctx, objectId, bson.M{"$push": bson.M{"versions": version}})
 	if err != nil {
@@ -137,6 +128,58 @@ func (m *Mongo) PublishMessageVersion(clientRequestId string, message *pb.Update
 	return nil
 }
 
+func (m *Mongo) UpdateMessageWithDiscordIdAndLastPublishRequest(id string, discordId string, requestId string) error {
+	collection := m.Client.Database(m.database).Collection("discord_messages")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	objectId, idErr := primitive.ObjectIDFromHex(id)
+	if idErr != nil {
+		return idErr
+	}
+
+	// Update the message
+	var updated DiscordMessage
+	updateErr := collection.FindOneAndUpdate(ctx, bson.M{"_id": objectId}, bson.M{"$set": bson.M{"discord_id": discordId, "last_client_request_published": requestId}}).Decode(&updated)
+	if updateErr != nil && updateErr == mongo.ErrNoDocuments {
+		return fmt.Errorf("message not found")
+	}
+
+	if updateErr != nil {
+		return updateErr
+	}
+
+	return nil
+}
+
+func (m *Mongo) UpdateMessageWithLastPublishRequest(id string, requestId string) error {
+	collection := m.Client.Database(m.database).Collection("discord_messages")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	objectId, idErr := primitive.ObjectIDFromHex(id)
+	if idErr != nil {
+		return idErr
+	}
+
+	// Update the message
+	var updated DiscordMessage
+	updateErr := collection.FindOneAndUpdate(ctx, bson.M{"_id": objectId}, bson.M{"$set": bson.M{"last_client_request_published": requestId}}).Decode(&updated)
+	if updateErr != nil && updateErr == mongo.ErrNoDocuments {
+		return fmt.Errorf("message not found")
+	}
+
+	if updateErr != nil {
+		return updateErr
+	}
+
+	return nil
+}
+
+/**
+ * Gets a discord message is present by id
+ * Should handle the case where the message is not present without erroring
+ */
 func (m *Mongo) GetDiscordMessageById(id string) (*DiscordMessage, error) {
 	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
