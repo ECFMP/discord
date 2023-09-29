@@ -58,7 +58,7 @@ func getClientRequestId(ctx context.Context) (string, error) {
  */
 func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) (*pb_discord.CreateResponse, error) {
 	if in.GetContent() == "" {
-		log.Warning("Invalid request: Content is required")
+		log.Warning("Invalid create request: Content is required")
 		return nil, status.Error(codes.InvalidArgument, "Content is required")
 	}
 
@@ -98,8 +98,13 @@ func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) 
  * Implements the UpdateMessage of the DiscordServer proto
  */
 func (server *server) Update(ctx context.Context, in *pb_discord.UpdateRequest) (*pb_discord.UpdateResponse, error) {
+	if in.GetId() == "" {
+		log.Warning("Invalid update request: Id is required")
+		return nil, status.Error(codes.InvalidArgument, "Id is required")
+	}
+
 	if in.GetContent() == "" {
-		log.Warning("Invalid request: Content is required")
+		log.Warning("Invalid update request: Content is required")
 		return nil, status.Error(codes.InvalidArgument, "Content is required")
 	}
 
@@ -111,7 +116,7 @@ func (server *server) Update(ctx context.Context, in *pb_discord.UpdateRequest) 
 
 	mongoErr := server.mongo.PublishMessageVersion(clientRequestId, in)
 	if mongoErr != nil && mongoErr.Error() == "message not found" {
-		log.Warning("Invalid request: message not found")
+		log.Warning("Invalid update request: message not found")
 		return nil, status.Error(codes.NotFound, codes.NotFound.String())
 	}
 

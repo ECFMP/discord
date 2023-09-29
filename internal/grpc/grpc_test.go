@@ -265,6 +265,48 @@ func Test_ItDoesntUpdateAMessageNotFound(t *testing.T) {
 	assert.Equal(t, 0, scheduler.callCount)
 }
 
+func Test_ItDoesntUpdateAMessageNoContent(t *testing.T) {
+	mongo, scheduler := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id-2")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	_, err := client.Update(ctx, &pb_discord.UpdateRequest{Id: mongoId, Content: ""})
+
+	assert.NotNil(t, err)
+	assert.Equal(t, status.Error(codes.InvalidArgument, "Content is required"), err)
+
+	assert.Equal(t, 0, scheduler.callCount)
+}
+
+func Test_ItDoesntUpdateAMessageNoIdSpecified(t *testing.T) {
+	mongo, scheduler := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id-2")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	_, err := client.Update(ctx, &pb_discord.UpdateRequest{Id: "", Content: "abc"})
+
+	assert.NotNil(t, err)
+	assert.Equal(t, status.Error(codes.InvalidArgument, "Id is required"), err)
+
+	assert.Equal(t, 0, scheduler.callCount)
+}
+
 func Test_ItDoesntUpdateAMessageClientRequestIdEmpty(t *testing.T) {
 	mongo, scheduler := SetupTest(t)
 	defer mongo.tearDown()
