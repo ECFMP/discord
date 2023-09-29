@@ -1,4 +1,3 @@
 #!/usr/bin/env sh
-
-#(cd proto && make discord_proto && make health_proto)
+make protobuf
 air -c .air.toml
