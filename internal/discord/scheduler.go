@@ -2,8 +2,8 @@ package discord
 
 import (
 	db "ecfmp/discord/internal/db"
-	"sync"
 	log "github.com/sirupsen/logrus"
+	"sync"
 )
 
 type Scheduler interface {
@@ -19,13 +19,13 @@ type DiscordScheduler struct {
 }
 
 /**
-  * Creates a new discord scheduler.
-  */
+ * Creates a new discord scheduler.
+ */
 func NewDiscordScheduler(mongo *db.Mongo, discordInterface Discord) *DiscordScheduler {
 	scheduler := &DiscordScheduler{
-		mongo:   mongo,
-		discord: discordInterface,
-		channel: make(chan string, 50),
+		mongo:              mongo,
+		discord:            discordInterface,
+		channel:            make(chan string, 50),
 		GoRoutineWaitGroup: &sync.WaitGroup{},
 	}
 
@@ -37,8 +37,8 @@ func NewDiscordScheduler(mongo *db.Mongo, discordInterface Discord) *DiscordSche
 }
 
 /**
-  * Schedules a message to be published to discord.
-  */
+ * Schedules a message to be published to discord.
+ */
 func (d *DiscordScheduler) ScheduleMessage(id string) {
 	log.Infof("Scheduler: Scheduling message with id %v", id)
 	d.GoRoutineWaitGroup.Add(1)
@@ -46,9 +46,9 @@ func (d *DiscordScheduler) ScheduleMessage(id string) {
 }
 
 /**
-  * Called by the scheduler's goroutine to process messages from the channel asynchonously to the
-  *	request that scheduled them.
-  */
+ * Called by the scheduler's goroutine to process messages from the channel asynchonously to the
+ *	request that scheduled them.
+ */
 func (d *DiscordScheduler) processChannel() {
 	log.Infof("Started discord scheduler routine")
 	for msg := range d.channel {
@@ -77,11 +77,11 @@ func (d *DiscordScheduler) processChannel() {
 }
 
 /**
-  * Publishes a new message to discord and updates the message in mongo to have the discord id.
-  */
+ * Publishes a new message to discord and updates the message in mongo to have the discord id.
+ */
 func publishNewMessage(d *DiscordScheduler, mongoMessage *db.DiscordMessage) {
-	versionToPublish := mongoMessage.Versions[len(mongoMessage.Versions)-1]
-	discordId, publishErr := d.discord.PublishMessage(versionToPublish.Content)
+	versionToPublish := &mongoMessage.Versions[len(mongoMessage.Versions)-1]
+	discordId, publishErr := d.discord.PublishMessage(versionToPublish)
 
 	if publishErr != nil {
 		log.Errorf("Scheduler: Failed to publish message to discord: %v", publishErr)
@@ -100,11 +100,11 @@ func publishNewMessage(d *DiscordScheduler, mongoMessage *db.DiscordMessage) {
 }
 
 /**
-  * Updates an existing message in discord and mongo.
-  */
+ * Updates an existing message in discord and mongo.
+ */
 func publishMessageUpdate(d *DiscordScheduler, mongoMessage *db.DiscordMessage) {
-	versionToPublish := mongoMessage.Versions[len(mongoMessage.Versions)-1]
-	updateErr := d.discord.UpdateMessage(versionToPublish.Content, mongoMessage.DiscordId)
+	versionToPublish := &mongoMessage.Versions[len(mongoMessage.Versions)-1]
+	updateErr := d.discord.UpdateMessage(versionToPublish, mongoMessage.DiscordId)
 	if updateErr != nil {
 		log.Errorf("Scheduler: Failed to update message: %v", updateErr)
 		return

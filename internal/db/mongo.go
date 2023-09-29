@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	discordgo "github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -14,9 +15,130 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+type DiscordEmbedField struct {
+	Name   string `bson:"name"`
+	Value  string `bson:"value"`
+	Inline bool   `bson:"is_inline"`
+}
+
+func (d *DiscordEmbedField) MarshallToLibraryMessageSend() *discordgo.MessageEmbedField {
+	return &discordgo.MessageEmbedField{
+		Name:   d.Name,
+		Value:  d.Value,
+		Inline: d.Inline,
+	}
+}
+
+type DiscordEmbed struct {
+	Title       string              `bson:"title"`
+	Description string              `bson:"description"`
+	Url         string              `bson:"url"`
+	Color       int32               `bson:"color"`
+	Fields      []DiscordEmbedField `bson:"fields"`
+}
+
+func (d *DiscordEmbed) MarshallToLibraryMessageSend() *discordgo.MessageEmbed {
+	embed := &discordgo.MessageEmbed{}
+
+	if d.Title != "" {
+		embed.Title = d.Title
+	}
+
+	if d.Description != "" {
+		embed.Description = d.Description
+	}
+
+	if d.Url != "" {
+		embed.URL = d.Url
+	}
+
+	if d.Color != 0 {
+		embed.Color = int(d.Color)
+	}
+
+	if len(d.Fields) > 0 {
+		embed.Fields = make([]*discordgo.MessageEmbedField, len(d.Fields))
+		for i := range d.Fields {
+			embed.Fields[i] = d.Fields[i].MarshallToLibraryMessageSend()
+		}
+	}
+
+	return embed
+}
+
+func DiscordEmbedToMongo(embeds *[]*pb.DiscordEmbeds) []DiscordEmbed {
+	result := make([]DiscordEmbed, len(*embeds))
+	for i := range *embeds {
+		embed := &(*embeds)[i]
+		result[i] = DiscordEmbed{
+			Title:       (*embed).Title,
+			Description: (*embed).Description,
+			Url:         (*embed).Url,
+			Color:       (*embed).Color,
+			Fields:      DiscordEmbedFieldsToMongo(&(*embed).Fields),
+		}
+	}
+	return result
+}
+
+func DiscordEmbedFieldsToMongo(fields *[]*pb.DiscordEmbedsFields) []DiscordEmbedField {
+	result := make([]DiscordEmbedField, len(*fields))
+	for i := range *fields {
+		field := &(*fields)[i]
+		result[i] = DiscordEmbedField{
+			Name:   (*field).Name,
+			Value:  (*field).Value,
+			Inline: (*field).Inline,
+		}
+	}
+	return result
+}
+
 type DiscordMessageVersion struct {
-	ClientRequestId string `bson:"client_request_id"`
-	Content         string `bson:"content"`
+	ClientRequestId string         `bson:"client_request_id"`
+	Content         string         `bson:"content"`
+	Embeds          []DiscordEmbed `bson:"embeds"`
+}
+
+func (d *DiscordMessageVersion) MarshallToLibraryMessageSend() *discordgo.MessageSend {
+	// Create the message
+	embeds := make([]*discordgo.MessageEmbed, len(d.Embeds))
+	for i := range d.Embeds {
+		embeds[i] = d.Embeds[i].MarshallToLibraryMessageSend()
+	}
+
+	return &discordgo.MessageSend{
+		Content: d.Content,
+		TTS:     false,
+		Embeds:  embeds,
+		AllowedMentions: &discordgo.MessageAllowedMentions{
+			Parse: []discordgo.AllowedMentionType{
+				discordgo.AllowedMentionTypeUsers,
+				discordgo.AllowedMentionTypeRoles,
+			},
+		},
+	}
+}
+
+func (d *DiscordMessageVersion) MarshallToLibraryMessageEdit(channel string, id string) *discordgo.MessageEdit {
+	// Create the message
+	embeds := make([]*discordgo.MessageEmbed, len(d.Embeds))
+	for i := range d.Embeds {
+		embeds[i] = d.Embeds[i].MarshallToLibraryMessageSend()
+	}
+
+	return &discordgo.MessageEdit{
+		ID:      id,
+		Channel: channel,
+		Content: &d.Content,
+		Embeds:  embeds,
+		AllowedMentions: &discordgo.MessageAllowedMentions{
+			Parse: []discordgo.AllowedMentionType{
+				discordgo.AllowedMentionTypeUsers,
+				discordgo.AllowedMentionTypeRoles,
+			},
+		},
+	}
 }
 
 type DiscordMessage struct {
@@ -86,9 +208,11 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.CreateRe
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	log.Errorf("Writing message to mongo: %v", message)
 	version := DiscordMessageVersion{
 		ClientRequestId: clientRequestId,
 		Content:         message.Content,
+		Embeds:          DiscordEmbedToMongo(&message.Embeds),
 	}
 	record := DiscordMessage{
 		Versions: []DiscordMessageVersion{version},
@@ -115,6 +239,7 @@ func (m *Mongo) PublishMessageVersion(clientRequestId string, message *pb.Update
 	version := DiscordMessageVersion{
 		ClientRequestId: clientRequestId,
 		Content:         message.Content,
+		Embeds:          DiscordEmbedToMongo(&message.Embeds),
 	}
 	updateCount, err := collection.UpdateByID(ctx, objectId, bson.M{"$push": bson.M{"versions": version}})
 	if err != nil {

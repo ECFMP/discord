@@ -20,8 +20,8 @@ import (
 type server struct {
 	pb_health.UnimplementedHealthServer
 	pb_discord.UnimplementedDiscordServer
-	server *grpc.Server
-	mongo  *db.Mongo
+	server    *grpc.Server
+	mongo     *db.Mongo
 	scheduler discord.Scheduler
 }
 
@@ -53,6 +53,25 @@ func getClientRequestId(ctx context.Context) (string, error) {
 	return metadata.Get("x-client-request-id")[0], nil
 }
 
+func validateEmbedFields(embeds []*pb_discord.DiscordEmbeds) error {
+	for _, embed := range embeds {
+		for _, field := range embed.Fields {
+			// Must have name, value and inline
+			if field.Name == "" {
+				log.Warning("Invalid request: embed name is required")
+				return fmt.Errorf("embed name is required")
+			}
+
+			if field.Value == "" {
+				log.Warning("Invalid request: embed value is required")
+				return fmt.Errorf("embed value is required")
+			}
+		}
+	}
+
+	return nil
+}
+
 /**
  * Implements the Create method of the DiscordServer interface
  */
@@ -79,6 +98,12 @@ func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) 
 		return &pb_discord.CreateResponse{Id: existingId.Id}, nil
 	}
 
+	// Validate the embed fields
+	embedFieldsErr := validateEmbedFields(in.Embeds)
+	if embedFieldsErr != nil {
+		return nil, status.Error(codes.InvalidArgument, embedFieldsErr.Error())
+	}
+
 	// Write the message to the database
 	mongoId, err := server.mongo.WriteDiscordMessage(clientRequestId, in)
 	if err != nil {
@@ -88,7 +113,6 @@ func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) 
 
 	// Schedule the message to be published
 	server.scheduler.ScheduleMessage(mongoId)
-
 
 	log.Infof("Written discord message %v", mongoId)
 	return &pb_discord.CreateResponse{Id: mongoId}, nil
@@ -106,6 +130,12 @@ func (server *server) Update(ctx context.Context, in *pb_discord.UpdateRequest) 
 	if in.GetContent() == "" {
 		log.Warning("Invalid update request: Content is required")
 		return nil, status.Error(codes.InvalidArgument, "Content is required")
+	}
+
+	// Validate the embed fields
+	embedFieldsErr := validateEmbedFields(in.Embeds)
+	if embedFieldsErr != nil {
+		return nil, status.Error(codes.InvalidArgument, embedFieldsErr.Error())
 	}
 
 	// Check if the message has already been written, and return the existing id if so

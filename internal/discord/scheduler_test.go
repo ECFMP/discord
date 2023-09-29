@@ -7,27 +7,27 @@ import (
 	pb "ecfmp/discord/proto/discord"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 type MockDiscord struct {
-	callCount int
-	callContent string
+	callCount     int
+	callVersion   db.DiscordMessageVersion
 	callDiscordId string
 }
 
 // publishMessage implements discord.Discord.
-func (d *MockDiscord) PublishMessage(content string) (string, error) {
+func (d *MockDiscord) PublishMessage(version *db.DiscordMessageVersion) (string, error) {
 	d.callCount++
-	d.callContent = content
+	d.callVersion = *version
 	return "123", nil
 }
 
 // updateMessage implements discord.Discord.
-func (d *MockDiscord) UpdateMessage(content string, discordId string) error {
+func (d *MockDiscord) UpdateMessage(version *db.DiscordMessageVersion, discordId string) error {
 	d.callCount++
-	d.callContent = content
+	d.callVersion = *version
 	d.callDiscordId = discordId
 	return nil
 }
@@ -77,7 +77,7 @@ func Test_ItPublishesNewMessages(t *testing.T) {
 
 	// Assert that the message was published to discord
 	assert.Equal(t, 1, mockDiscord.callCount)
-	assert.Equal(t, "Hello World", mockDiscord.callContent)
+	assert.Equal(t, "Hello World", mockDiscord.callVersion.Content)
 
 	// Check that the message was written to mongo
 	mongoMessage, mongoErr := testMongo.client.GetDiscordMessageById(mongoId)
@@ -110,7 +110,7 @@ func Test_ItUpdatesMessagesFromVersions(t *testing.T) {
 
 	// Assert that the message was published to discord
 	assert.Equal(t, 1, mockDiscord.callCount)
-	assert.Equal(t, "Hello World", mockDiscord.callContent)
+	assert.Equal(t, "Hello World", mockDiscord.callVersion.Content)
 	assert.Equal(t, "123", mockDiscord.callDiscordId)
 
 	// Check that the message was written to mongo

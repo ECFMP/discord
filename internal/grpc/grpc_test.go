@@ -31,7 +31,7 @@ type TestMongo struct {
 
 type MockScheduler struct {
 	callCount int
-	callId string
+	callId    string
 }
 
 func (scheduler *MockScheduler) ScheduleMessage(id string) {
@@ -111,7 +111,31 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 
 	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
 	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
-	resp, err := client.Create(ctx, &pb_discord.CreateRequest{Content: "Hello, world!"})
+	resp, err := client.Create(
+		ctx,
+		&pb_discord.CreateRequest{
+			Content:   "Hello World!",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		})
 
 	assert.Nil(t, err)
 	responseId := resp.GetId()
@@ -121,7 +145,17 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 	assert.Equal(t, responseId, mongoMessage.Id)
 	assert.Equal(t, 1, len(mongoMessage.Versions))
 	assert.Equal(t, "my-client-request-id", mongoMessage.Versions[0].ClientRequestId)
-	assert.Equal(t, "Hello, world!", mongoMessage.Versions[0].Content)
+	assert.Equal(t, "Hello World!", mongoMessage.Versions[0].Content)
+	assert.Equal(t, "Hello World!", mongoMessage.Versions[0].Embeds[0].Title)
+	assert.Equal(t, "This is a test", mongoMessage.Versions[0].Embeds[0].Description)
+	assert.Equal(t, "https://example.com", mongoMessage.Versions[0].Embeds[0].Url)
+	assert.Equal(t, int32(123456), mongoMessage.Versions[0].Embeds[0].Color)
+	assert.Equal(t, "Field 1", mongoMessage.Versions[0].Embeds[0].Fields[0].Name)
+	assert.Equal(t, "Value 1", mongoMessage.Versions[0].Embeds[0].Fields[0].Value)
+	assert.Equal(t, true, mongoMessage.Versions[0].Embeds[0].Fields[0].Inline)
+	assert.Equal(t, "Field 2", mongoMessage.Versions[0].Embeds[0].Fields[1].Name)
+	assert.Equal(t, "Value 2", mongoMessage.Versions[0].Embeds[0].Fields[1].Value)
+	assert.Equal(t, false, mongoMessage.Versions[0].Embeds[0].Fields[1].Inline)
 
 	assert.Equal(t, 1, scheduler.callCount)
 	assert.Equal(t, responseId, scheduler.callId)
@@ -199,6 +233,92 @@ func Test_ItRejectsRequestsThatDontHaveContent(t *testing.T) {
 	assert.Equal(t, 0, scheduler.callCount)
 }
 
+func Test_ItRejectsAMessageThatHasMissingFieldName(t *testing.T) {
+	mongo, scheduler := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Create(
+		ctx,
+		&pb_discord.CreateRequest{
+			Content:   "Hello World!",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		})
+
+	assert.Equal(t, err, status.Error(codes.InvalidArgument, "embed name is required"))
+	assert.Nil(t, resp)
+
+	assert.Equal(t, 0, scheduler.callCount)
+}
+
+func Test_ItRejectsAMessageThatHasMissingFieldValue(t *testing.T) {
+	mongo, scheduler := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Create(
+		ctx,
+		&pb_discord.CreateRequest{
+			Content:   "Hello World!",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "",
+							Inline: false,
+						},
+					},
+				},
+			},
+		})
+
+	assert.Equal(t, err, status.Error(codes.InvalidArgument, "embed value is required"))
+	assert.Nil(t, resp)
+
+	assert.Equal(t, 0, scheduler.callCount)
+}
+
 func Test_ItDoesAHealthCheck(t *testing.T) {
 	mongo, _ := SetupTest(t)
 	defer mongo.tearDown()
@@ -226,7 +346,34 @@ func Test_ItUpdatesAMessage(t *testing.T) {
 
 	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id-2")
 	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
-	_, err := client.Update(ctx, &pb_discord.UpdateRequest{Id: mongoId, Content: "Hello, world, again!"})
+	_, err := client.Update(
+		ctx,
+		&pb_discord.UpdateRequest{
+			Id:        mongoId,
+			Content:   "Hello, world, again!",
+
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		},
+	)
 
 	assert.Nil(t, err)
 
@@ -239,6 +386,17 @@ func Test_ItUpdatesAMessage(t *testing.T) {
 	assert.Equal(t, "Hello, world!", mongoMessage.Versions[0].Content)
 	assert.Equal(t, "my-client-request-id-2", mongoMessage.Versions[1].ClientRequestId)
 	assert.Equal(t, "Hello, world, again!", mongoMessage.Versions[1].Content)
+	assert.Equal(t, "Hello World!", mongoMessage.Versions[1].Embeds[0].Title)
+	assert.Equal(t, "This is a test", mongoMessage.Versions[1].Embeds[0].Description)
+	assert.Equal(t, "https://example.com", mongoMessage.Versions[1].Embeds[0].Url)
+	assert.Equal(t, int32(123456), mongoMessage.Versions[1].Embeds[0].Color)
+	assert.Equal(t, "Field 1", mongoMessage.Versions[1].Embeds[0].Fields[0].Name)
+	assert.Equal(t, "Value 1", mongoMessage.Versions[1].Embeds[0].Fields[0].Value)
+	assert.Equal(t, true, mongoMessage.Versions[1].Embeds[0].Fields[0].Inline)
+	assert.Equal(t, "Field 2", mongoMessage.Versions[1].Embeds[0].Fields[1].Name)
+	assert.Equal(t, "Value 2", mongoMessage.Versions[1].Embeds[0].Fields[1].Value)
+	assert.Equal(t, false, mongoMessage.Versions[1].Embeds[0].Fields[1].Inline)
+
 
 	assert.Equal(t, 1, scheduler.callCount)
 	assert.Equal(t, mongoId, scheduler.callId)
@@ -303,6 +461,100 @@ func Test_ItDoesntUpdateAMessageNoIdSpecified(t *testing.T) {
 
 	assert.NotNil(t, err)
 	assert.Equal(t, status.Error(codes.InvalidArgument, "Id is required"), err)
+
+	assert.Equal(t, 0, scheduler.callCount)
+}
+
+func Test_ItRejectsAnUpdateThatHasMissingFieldName(t *testing.T) {
+	mongo, scheduler := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Update(
+		ctx,
+		&pb_discord.UpdateRequest{
+			Id:        mongoId,
+			Content:   "Hello, world, again!",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		},
+	)
+
+	assert.Equal(t, err, status.Error(codes.InvalidArgument, "embed name is required"))
+	assert.Nil(t, resp)
+
+	assert.Equal(t, 0, scheduler.callCount)
+}
+
+func Test_ItRejectsAnUpdateThatHasMissingFieldValue(t *testing.T) {
+	mongo, scheduler := SetupTest(t)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Update(
+		ctx,
+		&pb_discord.UpdateRequest{
+			Id:        mongoId,
+			Content:   "Hello, world, again!",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		},
+	)
+
+	assert.Equal(t, err, status.Error(codes.InvalidArgument, "embed value is required"))
+	assert.Nil(t, resp)
 
 	assert.Equal(t, 0, scheduler.callCount)
 }
