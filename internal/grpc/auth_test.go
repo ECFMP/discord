@@ -1,4 +1,5 @@
 //go:build testing
+
 package grpc_test
 
 import (
@@ -8,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/codes"
 	metadata "google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )

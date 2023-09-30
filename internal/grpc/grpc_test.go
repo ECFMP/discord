@@ -126,7 +126,7 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 	resp, err := client.Create(
 		ctx,
 		&pb_discord.CreateRequest{
-			Content:   "Hello World!",
+			Content: "Hello World!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
 					Title:       "Hello World!",
@@ -190,7 +190,7 @@ func Test_ItAllowsCreateIfAuthenticated(t *testing.T) {
 	resp, err := client.Create(
 		ctx,
 		&pb_discord.CreateRequest{
-			Content:   "Hello World!",
+			Content: "Hello World!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
 					Title:       "Hello World!",
@@ -239,7 +239,7 @@ func Test_ItForbidsCreateIfNotAuthenticated(t *testing.T) {
 	resp, err := client.Create(
 		ctx,
 		&pb_discord.CreateRequest{
-			Content:   "Hello World!",
+			Content: "Hello World!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
 					Title:       "Hello World!",
@@ -353,7 +353,7 @@ func Test_ItRejectsAMessageThatHasMissingFieldName(t *testing.T) {
 	resp, err := client.Create(
 		ctx,
 		&pb_discord.CreateRequest{
-			Content:   "Hello World!",
+			Content: "Hello World!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
 					Title:       "Hello World!",
@@ -396,7 +396,7 @@ func Test_ItRejectsAMessageThatHasMissingFieldValue(t *testing.T) {
 	resp, err := client.Create(
 		ctx,
 		&pb_discord.CreateRequest{
-			Content:   "Hello World!",
+			Content: "Hello World!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
 					Title:       "Hello World!",
@@ -469,8 +469,8 @@ func Test_ItUpdatesAMessage(t *testing.T) {
 	_, err := client.Update(
 		ctx,
 		&pb_discord.UpdateRequest{
-			Id:        mongoId,
-			Content:   "Hello, world, again!",
+			Id:      mongoId,
+			Content: "Hello, world, again!",
 
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
@@ -517,7 +517,6 @@ func Test_ItUpdatesAMessage(t *testing.T) {
 	assert.Equal(t, "Value 2", mongoMessage.Versions[1].Embeds[0].Fields[1].Value)
 	assert.Equal(t, false, mongoMessage.Versions[1].Embeds[0].Fields[1].Inline)
 
-
 	assert.Equal(t, 1, scheduler.callCount)
 	assert.Equal(t, mongoId, scheduler.callId)
 }
@@ -541,8 +540,8 @@ func Test_ItUpdatesAMessageIfAuthenticated(t *testing.T) {
 	_, err := client.Update(
 		ctx,
 		&pb_discord.UpdateRequest{
-			Id:        mongoId,
-			Content:   "Hello, world, again!",
+			Id:      mongoId,
+			Content: "Hello, world, again!",
 
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
@@ -596,8 +595,8 @@ func Test_ItRejectsAMessageIfNotAuthenticated(t *testing.T) {
 	_, err := client.Update(
 		ctx,
 		&pb_discord.UpdateRequest{
-			Id:        mongoId,
-			Content:   "Hello, world, again!",
+			Id:      mongoId,
+			Content: "Hello, world, again!",
 
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
@@ -705,8 +704,8 @@ func Test_ItRejectsAnUpdateThatHasMissingFieldName(t *testing.T) {
 	resp, err := client.Update(
 		ctx,
 		&pb_discord.UpdateRequest{
-			Id:        mongoId,
-			Content:   "Hello, world, again!",
+			Id:      mongoId,
+			Content: "Hello, world, again!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
 					Title:       "Hello World!",
@@ -752,8 +751,8 @@ func Test_ItRejectsAnUpdateThatHasMissingFieldValue(t *testing.T) {
 	resp, err := client.Update(
 		ctx,
 		&pb_discord.UpdateRequest{
-			Id:        mongoId,
-			Content:   "Hello, world, again!",
+			Id:      mongoId,
+			Content: "Hello, world, again!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
 					Title:       "Hello World!",
