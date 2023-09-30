@@ -4,7 +4,6 @@ import (
 	db "ecfmp/discord/internal/db"
 	discord "ecfmp/discord/internal/discord"
 	grpc "ecfmp/discord/internal/grpc"
-	"fmt"
 	"net"
 	"os"
 
@@ -37,8 +36,21 @@ func main() {
 	// Create the discord scheduler
 	scheduler := discord.NewDiscordScheduler(mongo, publisher)
 
-	grpcServer := grpc.NewServer(mongo, scheduler)
-	fmt.Println("Discord server started!")
+	// Get the public key from the environment
+	publicKeyFile := os.Getenv("AUTH_JWT_PUBLIC_KEY_FILE")
+	if publicKeyFile == "" {
+		log.Fatalf("AUTH_JWT_PUBLIC_KEY_FILE is not set")
+	}
+
+	// Get the public key by reading the file, throw error if file doesnt exist
+	publicKey, err := os.ReadFile(publicKeyFile)
+	if err != nil {
+		log.Fatalf("failed to read public key file: %v", err)
+	}
+	interceptor := grpc.NewJwtAuthInterceptor(publicKey, os.Getenv("AUTH_JWT_AUDIENCE"))
+
+	grpcServer := grpc.NewServer(mongo, scheduler, interceptor)
+	log.Info("Discord server starting...")
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

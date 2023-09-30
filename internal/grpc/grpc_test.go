@@ -39,7 +39,7 @@ func (scheduler *MockScheduler) ScheduleMessage(id string) {
 	scheduler.callId = id
 }
 
-func SetupTest(t *testing.T) (TestMongo, *MockScheduler) {
+func SetupTest(t *testing.T, realInterceptor bool) (TestMongo, *MockScheduler) {
 	// Turn off logging except for fatals
 	log.SetLevel(log.FatalLevel)
 
@@ -54,9 +54,21 @@ func SetupTest(t *testing.T) (TestMongo, *MockScheduler) {
 	// Mock scheduler
 	scheduler := &MockScheduler{}
 
+	var interceptor ecfmp_grpc.AuthInterceptor
+	if realInterceptor {
+		publicKeyBytes, err := GetPublicKeyBytes()
+		if err != nil {
+			t.Errorf("Failed to get public key bytes: %v", err)
+		}
+
+		interceptor = ecfmp_grpc.NewJwtAuthInterceptor(publicKeyBytes, "test-aud")
+	} else {
+		interceptor = ecfmp_grpc.NewNullInterceptor()
+	}
+
 	// gRPC setup
 	lis = bufconn.Listen(bufSize)
-	s := ecfmp_grpc.NewServer(mongo, scheduler)
+	s := ecfmp_grpc.NewServer(mongo, scheduler, interceptor)
 	go func() {
 		if err := s.Serve(lis); err != nil {
 			log.Fatalf("Server exited with error: %v", err)
@@ -101,7 +113,7 @@ func setupGrpcClient() TestClient {
 }
 
 func Test_ItCreatesADiscordMessage(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -161,8 +173,102 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 	assert.Equal(t, responseId, scheduler.callId)
 }
 
+func Test_ItAllowsCreateIfAuthenticated(t *testing.T) {
+	mongo, _ := SetupTest(t, true)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	token, err := SignJwt("test-aud", "ecfmp-auth")
+	assert.Nil(t, err)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id", "authorization", token)
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Create(
+		ctx,
+		&pb_discord.CreateRequest{
+			Content:   "Hello World!",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		})
+
+	assert.Nil(t, err)
+	responseId := resp.GetId()
+	mongoMessage, err := mongo.client.GetDiscordMessageById(responseId)
+
+	assert.Nil(t, err)
+	assert.Equal(t, responseId, mongoMessage.Id)
+}
+
+func Test_ItForbidsCreateIfNotAuthenticated(t *testing.T) {
+	mongo, _ := SetupTest(t, true)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	// Token is signed with a different key
+	token, err := SignJwtWithFile("test-aud", "ecfmp-auth", "../../docker/dev_private_key_2.pem")
+	assert.Nil(t, err)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id", "authorization", token)
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Create(
+		ctx,
+		&pb_discord.CreateRequest{
+			Content:   "Hello World!",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		})
+
+	assert.NotNil(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, status.Error(codes.Unauthenticated, codes.Unauthenticated.String()), err)
+}
+
 func Test_ItReturnsPrexistingIdIfRequestAlreadyExists(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -184,7 +290,7 @@ func Test_ItReturnsPrexistingIdIfRequestAlreadyExists(t *testing.T) {
 }
 
 func Test_ItRejectsRequestsThatDontHaveAClientRequestId(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -200,7 +306,7 @@ func Test_ItRejectsRequestsThatDontHaveAClientRequestId(t *testing.T) {
 }
 
 func Test_ItRejectsRequestsThatHaveAnEmptyClientRequestId(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -218,7 +324,7 @@ func Test_ItRejectsRequestsThatHaveAnEmptyClientRequestId(t *testing.T) {
 }
 
 func Test_ItRejectsRequestsThatDontHaveContent(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -234,7 +340,7 @@ func Test_ItRejectsRequestsThatDontHaveContent(t *testing.T) {
 }
 
 func Test_ItRejectsAMessageThatHasMissingFieldName(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -277,7 +383,7 @@ func Test_ItRejectsAMessageThatHasMissingFieldName(t *testing.T) {
 }
 
 func Test_ItRejectsAMessageThatHasMissingFieldValue(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -320,7 +426,21 @@ func Test_ItRejectsAMessageThatHasMissingFieldValue(t *testing.T) {
 }
 
 func Test_ItDoesAHealthCheck(t *testing.T) {
-	mongo, _ := SetupTest(t)
+	mongo, _ := SetupTest(t, false)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_health.NewHealthClient(grpcClient.conn)
+
+	resp, err := client.Check(context.Background(), &pb_health.HealthCheckRequest{})
+	assert.Nil(t, err)
+	assert.Equal(t, resp.Status, pb_health.HealthCheckResponse_SERVING)
+}
+
+func Test_ItDoesAHealthCheckIfUnauthenticated(t *testing.T) {
+	mongo, _ := SetupTest(t, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -334,7 +454,7 @@ func Test_ItDoesAHealthCheck(t *testing.T) {
 }
 
 func Test_ItUpdatesAMessage(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -402,8 +522,112 @@ func Test_ItUpdatesAMessage(t *testing.T) {
 	assert.Equal(t, mongoId, scheduler.callId)
 }
 
+func Test_ItUpdatesAMessageIfAuthenticated(t *testing.T) {
+	mongo, _ := SetupTest(t, true)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	token, tokenErr := SignJwt("test-aud", "ecfmp-auth")
+	assert.Nil(t, tokenErr)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id-2", "authorization", token)
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	_, err := client.Update(
+		ctx,
+		&pb_discord.UpdateRequest{
+			Id:        mongoId,
+			Content:   "Hello, world, again!",
+
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		},
+	)
+
+	assert.Nil(t, err)
+
+	// Then
+	mongoMessage, err := mongo.client.GetDiscordMessageById(mongoId)
+	assert.Nil(t, err)
+	assert.Equal(t, mongoId, mongoMessage.Id)
+	assert.Equal(t, 2, len(mongoMessage.Versions))
+}
+
+func Test_ItRejectsAMessageIfNotAuthenticated(t *testing.T) {
+	mongo, _ := SetupTest(t, true)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	// Token is signed with a different key
+	token, tokenErr := SignJwtWithFile("test-aud", "ecfmp-auth", "../../docker/dev_private_key_2.pem")
+	assert.Nil(t, tokenErr)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id-2", "authorization", token)
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	_, err := client.Update(
+		ctx,
+		&pb_discord.UpdateRequest{
+			Id:        mongoId,
+			Content:   "Hello, world, again!",
+
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		},
+	)
+
+	assert.NotNil(t, err)
+	assert.Equal(t, status.Error(codes.Unauthenticated, codes.Unauthenticated.String()), err)
+}
+
 func Test_ItDoesntUpdateAMessageNotFound(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -424,7 +648,7 @@ func Test_ItDoesntUpdateAMessageNotFound(t *testing.T) {
 }
 
 func Test_ItDoesntUpdateAMessageNoContent(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -445,7 +669,7 @@ func Test_ItDoesntUpdateAMessageNoContent(t *testing.T) {
 }
 
 func Test_ItDoesntUpdateAMessageNoIdSpecified(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -466,7 +690,7 @@ func Test_ItDoesntUpdateAMessageNoIdSpecified(t *testing.T) {
 }
 
 func Test_ItRejectsAnUpdateThatHasMissingFieldName(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -513,7 +737,7 @@ func Test_ItRejectsAnUpdateThatHasMissingFieldName(t *testing.T) {
 }
 
 func Test_ItRejectsAnUpdateThatHasMissingFieldValue(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -560,7 +784,7 @@ func Test_ItRejectsAnUpdateThatHasMissingFieldValue(t *testing.T) {
 }
 
 func Test_ItDoesntUpdateAMessageClientRequestIdEmpty(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -581,7 +805,7 @@ func Test_ItDoesntUpdateAMessageClientRequestIdEmpty(t *testing.T) {
 }
 
 func Test_ItDoesntUpdateAMessageClientRequestIdMissing(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -600,7 +824,7 @@ func Test_ItDoesntUpdateAMessageClientRequestIdMissing(t *testing.T) {
 }
 
 func Test_ItCanCreateThenUpdateAMessage(t *testing.T) {
-	mongo, scheduler := SetupTest(t)
+	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()

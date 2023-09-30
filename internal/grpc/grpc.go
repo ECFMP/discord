@@ -76,6 +76,7 @@ func validateEmbedFields(embeds []*pb_discord.DiscordEmbeds) error {
  * Implements the Create method of the DiscordServer interface
  */
 func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) (*pb_discord.CreateResponse, error) {
+	log.Debug("Create request received")
 	if in.GetContent() == "" {
 		log.Warning("Invalid create request: Content is required")
 		return nil, status.Error(codes.InvalidArgument, "Content is required")
@@ -86,6 +87,8 @@ func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) 
 	if requestIdErr != nil {
 		return nil, status.Error(codes.InvalidArgument, requestIdErr.Error())
 	}
+
+	log.Debugf("Client request id: %v", clientRequestId)
 
 	existingId, err := server.mongo.GetDiscordMessageByClientRequestId(clientRequestId)
 	if err != nil {
@@ -177,8 +180,8 @@ func (server *server) Check(ctx context.Context, in *pb_health.HealthCheckReques
 /**
  * Start the gRPC server
  */
-func NewServer(mongo *db.Mongo, scheduler discord.Scheduler) *server {
-	s := grpc.NewServer()
+func NewServer(mongo *db.Mongo, scheduler discord.Scheduler, interceptor AuthInterceptor) *server {
+	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor.AuthInterceptor))
 	server := &server{mongo: mongo, server: s, scheduler: scheduler}
 	pb_discord.RegisterDiscordServer(s, server)
 	pb_health.RegisterHealthServer(s, server)

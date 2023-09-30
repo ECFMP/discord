@@ -208,7 +208,6 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.CreateRe
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	log.Errorf("Writing message to mongo: %v", message)
 	version := DiscordMessageVersion{
 		ClientRequestId: clientRequestId,
 		Content:         message.Content,
