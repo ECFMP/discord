@@ -7,7 +7,7 @@ import (
 	"net"
 	"os"
 
-	logConfig "ecfmp/internal/log"
+	logConfig "ecfmp/discord/internal/log"
 
 	log "github.com/sirupsen/logrus"
 )

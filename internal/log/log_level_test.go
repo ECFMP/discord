@@ -2,7 +2,7 @@ package log_test
 
 import (
 	"testing"
-	log "ecfmp/internal/log"
+	log "ecfmp/discord/internal/log"
 	logger "github.com/sirupsen/logrus"
 )
 
