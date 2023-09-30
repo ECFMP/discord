@@ -7,8 +7,9 @@ import (
 	"net"
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	logConfig "ecfmp/internal/log"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
