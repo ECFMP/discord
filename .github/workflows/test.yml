@@ -17,9 +17,6 @@ jobs:
           token: ${{ secrets.PROTOBUF_TOKEN }}
           submodules: true
 
-      - name: Build Protobuf
-        run: make protobuf
-
       - name: Start containers
         run: docker compose up -d --build --wait go_testing
 
