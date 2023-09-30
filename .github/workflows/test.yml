@@ -21,7 +21,7 @@ jobs:
         run: docker compose up -d --build --wait go_testing
 
       - name: Container Logs
-        run: docker logs go_testing
+        run: docker compose logs go_testing
 
       - name: Run Tests
         run: make test
