@@ -21,6 +21,8 @@ services:
       - "8080:80"
     volumes:
       - .:/app
+    networks:
+      - default
 
   go_testing:
     build:
@@ -40,6 +42,8 @@ services:
       AUTH_JWT_AUDIENCE: 'ecfmp-discord-dev'
     volumes:
       - .:/app
+    networks:
+      - default
 
   mongodb:
     image: mongo:6.0
@@ -52,6 +56,12 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example_password
+    networks:
+      - default
 
 volumes:
   mongodb_data:
+
+networks:
+  default:
+    name: ecfmp
