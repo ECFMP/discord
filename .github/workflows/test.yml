@@ -24,7 +24,10 @@ jobs:
         run: docker compose logs go_testing
 
       - name: Run Tests
-        run: make test
+        run: |
+          ls -la
+          whoami
+          make test
 
   format:
     runs-on: ubuntu-latest
