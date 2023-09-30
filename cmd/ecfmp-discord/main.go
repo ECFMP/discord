@@ -8,9 +8,13 @@ import (
 	"os"
 
 	log "github.com/sirupsen/logrus"
+	logConfig "ecfmp/internal/log"
 )
 
 func main() {
+	// Set the logging level
+	log.SetLevel(logConfig.EnvToLogLevel(os.Getenv("LOG_LEVEL")))
+
 	listener, err := net.Listen("tcp", ":80")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
