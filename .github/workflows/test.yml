@@ -36,7 +36,7 @@ jobs:
         run: make protobuf
 
       - name: Start containers
-        run: docker compose up -d --build --wait go_testing
+        run: docker compose up -d --build --wait go_testing mongodb
 
       - name: Run Tests
         run: make test
