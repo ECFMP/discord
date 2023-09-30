@@ -6,7 +6,7 @@ import (
 	logger "github.com/sirupsen/logrus"
 )
 
-var logLevelTest = [struct]{
+var logLevelTest = []struct{
 	in string
 	expected logger.Level
 } {
