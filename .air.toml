@@ -6,11 +6,11 @@ tmp_dir = ".build"
   args_bin = []
   bin = "./.build/main"
   cmd = "go build -o ./.build/main ./cmd/ecfmp-discord"
-  delay = 0
+  delay = 3000
   exclude_dir = ["assets", ".build", "vendor", "testdata"]
   exclude_file = []
   exclude_regex = ["_test.go"]
-  exclude_unchanged = false
+  exclude_unchanged = true
   follow_symlink = false
   full_bin = ""
   include_dir = []
@@ -22,8 +22,8 @@ tmp_dir = ".build"
   poll_interval = 0
   rerun = false
   rerun_delay = 500
-  send_interrupt = false
-  stop_on_error = false
+  send_interrupt = true
+  stop_on_error = true
 
 [color]
   app = ""
@@ -40,5 +40,5 @@ tmp_dir = ".build"
   clean_on_exit = false
 
 [screen]
-  clear_on_rebuild = false
+  clear_on_rebuild = true
   keep_scroll = true

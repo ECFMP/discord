@@ -98,6 +98,7 @@ type DiscordMessageVersion struct {
 	ClientRequestId string         `bson:"client_request_id"`
 	Content         string         `bson:"content"`
 	Embeds          []DiscordEmbed `bson:"embeds"`
+	CreatedAt       time.Time      `bson:"created_at"`
 }
 
 func (d *DiscordMessageVersion) MarshallToLibraryMessageSend() *discordgo.MessageSend {
@@ -146,6 +147,7 @@ type DiscordMessage struct {
 	DiscordId                  string                  `bson:"discord_id"`
 	LastClientRequestPublished string                  `bson:"last_client_request_published"`
 	Versions                   []DiscordMessageVersion `bson:"versions"`
+	CreatedAt                  time.Time               `bson:"created_at"`
 }
 
 type Mongo struct {
@@ -194,6 +196,22 @@ func NewMongo() (*Mongo, error) {
 		return nil, indexErr
 	}
 
+	// Create an index on a ttl field that will delete messages after 1 week
+	_, indexErr = collection.Indexes().CreateOne(
+		context.Background(),
+		mongo.IndexModel{
+			Keys: bson.M{
+				"created_at": 1,
+			},
+			Options: options.Index().SetExpireAfterSeconds(604800).SetName("created_at"),
+		},
+	)
+
+	if indexErr != nil {
+		log.Errorf("Failed to create index: %v", indexErr)
+		return nil, indexErr
+	}
+
 	return &Mongo{
 		Client:   client,
 		database: os.Getenv("MONGO_DB"),
@@ -212,9 +230,11 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.CreateRe
 		ClientRequestId: clientRequestId,
 		Content:         message.Content,
 		Embeds:          DiscordEmbedToMongo(&message.Embeds),
+		CreatedAt:       time.Now(),
 	}
 	record := DiscordMessage{
-		Versions: []DiscordMessageVersion{version},
+		Versions:  []DiscordMessageVersion{version},
+		CreatedAt: time.Now(),
 	}
 	res, err := collection.InsertOne(ctx, record)
 	if err != nil {
@@ -239,6 +259,7 @@ func (m *Mongo) PublishMessageVersion(clientRequestId string, message *pb.Update
 		ClientRequestId: clientRequestId,
 		Content:         message.Content,
 		Embeds:          DiscordEmbedToMongo(&message.Embeds),
+		CreatedAt:       time.Now(),
 	}
 	updateCount, err := collection.UpdateByID(ctx, objectId, bson.M{"$push": bson.M{"versions": version}})
 	if err != nil {

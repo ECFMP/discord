@@ -5,6 +5,7 @@ import (
 	db "ecfmp/discord/internal/db"
 	pb "ecfmp/discord/proto/discord"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -73,8 +74,13 @@ func Test_ItWritesADiscordMessage(t *testing.T) {
 	var result db.DiscordMessage
 	err = mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), map[string]string{"versions.client_request_id": "1"}).Decode(&result)
 	assert.Nil(t, err)
+	assert.Equal(t, id, result.Id)
+	assert.GreaterOrEqual(t, result.CreatedAt.Unix(), time.Now().Unix()-5)
+	assert.LessOrEqual(t, result.CreatedAt.Unix(), time.Now().Unix())
 	assert.Equal(t, 1, len(result.Versions))
 	assert.Equal(t, "1", result.Versions[0].ClientRequestId)
+	assert.GreaterOrEqual(t, result.Versions[0].CreatedAt.Unix(), time.Now().Unix()-5)
+	assert.LessOrEqual(t, result.Versions[0].CreatedAt.Unix(), time.Now().Unix())
 	assert.Equal(t, "Hello World!", result.Versions[0].Content)
 	assert.Equal(t, 1, len(result.Versions[0].Embeds))
 	assert.Equal(t, "Hello World!", result.Versions[0].Embeds[0].Title)
@@ -238,6 +244,8 @@ func Test_ItUpdatesMessageById(t *testing.T) {
 	assert.Equal(t, "Hello World!", result.Versions[0].Content)
 	assert.Equal(t, "another-request-id", result.Versions[1].ClientRequestId)
 	assert.Equal(t, "Hello Go!", result.Versions[1].Content)
+	assert.GreaterOrEqual(t, result.Versions[1].CreatedAt.Unix(), time.Now().Unix()-5)
+	assert.LessOrEqual(t, result.Versions[1].CreatedAt.Unix(), time.Now().Unix())
 	assert.Equal(t, 1, len(result.Versions[1].Embeds))
 	assert.Equal(t, "Hello World!", result.Versions[1].Embeds[0].Title)
 	assert.Equal(t, "This is a test", result.Versions[1].Embeds[0].Description)
