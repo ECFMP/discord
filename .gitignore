@@ -19,3 +19,10 @@
 
 # Go workspace file
 go.work
+
+
+# Build
+.build/
+
+# The environment file is used to store the environment variables
+.env
