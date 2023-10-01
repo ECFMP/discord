@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	discordgo "github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -15,146 +14,14 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type DiscordEmbedField struct {
-	Name   string `bson:"name"`
-	Value  string `bson:"value"`
-	Inline bool   `bson:"is_inline"`
-}
-
-func (d *DiscordEmbedField) MarshallToLibraryMessageSend() *discordgo.MessageEmbedField {
-	return &discordgo.MessageEmbedField{
-		Name:   d.Name,
-		Value:  d.Value,
-		Inline: d.Inline,
-	}
-}
-
-type DiscordEmbed struct {
-	Title       string              `bson:"title"`
-	Description string              `bson:"description"`
-	Url         string              `bson:"url"`
-	Color       int32               `bson:"color"`
-	Fields      []DiscordEmbedField `bson:"fields"`
-}
-
-func (d *DiscordEmbed) MarshallToLibraryMessageSend() *discordgo.MessageEmbed {
-	embed := &discordgo.MessageEmbed{}
-
-	if d.Title != "" {
-		embed.Title = d.Title
-	}
-
-	if d.Description != "" {
-		embed.Description = d.Description
-	}
-
-	if d.Url != "" {
-		embed.URL = d.Url
-	}
-
-	if d.Color != 0 {
-		embed.Color = int(d.Color)
-	}
-
-	if len(d.Fields) > 0 {
-		embed.Fields = make([]*discordgo.MessageEmbedField, len(d.Fields))
-		for i := range d.Fields {
-			embed.Fields[i] = d.Fields[i].MarshallToLibraryMessageSend()
-		}
-	}
-
-	return embed
-}
-
-func DiscordEmbedToMongo(embeds *[]*pb.DiscordEmbeds) []DiscordEmbed {
-	result := make([]DiscordEmbed, len(*embeds))
-	for i := range *embeds {
-		embed := &(*embeds)[i]
-		result[i] = DiscordEmbed{
-			Title:       (*embed).Title,
-			Description: (*embed).Description,
-			Url:         (*embed).Url,
-			Color:       (*embed).Color,
-			Fields:      DiscordEmbedFieldsToMongo(&(*embed).Fields),
-		}
-	}
-	return result
-}
-
-func DiscordEmbedFieldsToMongo(fields *[]*pb.DiscordEmbedsFields) []DiscordEmbedField {
-	result := make([]DiscordEmbedField, len(*fields))
-	for i := range *fields {
-		field := &(*fields)[i]
-		result[i] = DiscordEmbedField{
-			Name:   (*field).Name,
-			Value:  (*field).Value,
-			Inline: (*field).Inline,
-		}
-	}
-	return result
-}
-
-type DiscordMessageVersion struct {
-	ClientRequestId string         `bson:"client_request_id"`
-	Content         string         `bson:"content"`
-	Embeds          []DiscordEmbed `bson:"embeds"`
-	CreatedAt       time.Time      `bson:"created_at"`
-}
-
-func (d *DiscordMessageVersion) MarshallToLibraryMessageSend() *discordgo.MessageSend {
-	// Create the message
-	embeds := make([]*discordgo.MessageEmbed, len(d.Embeds))
-	for i := range d.Embeds {
-		embeds[i] = d.Embeds[i].MarshallToLibraryMessageSend()
-	}
-
-	return &discordgo.MessageSend{
-		Content: d.Content,
-		TTS:     false,
-		Embeds:  embeds,
-		AllowedMentions: &discordgo.MessageAllowedMentions{
-			Parse: []discordgo.AllowedMentionType{
-				discordgo.AllowedMentionTypeUsers,
-				discordgo.AllowedMentionTypeRoles,
-			},
-		},
-	}
-}
-
-func (d *DiscordMessageVersion) MarshallToLibraryMessageEdit(channel string, id string) *discordgo.MessageEdit {
-	// Create the message
-	embeds := make([]*discordgo.MessageEmbed, len(d.Embeds))
-	for i := range d.Embeds {
-		embeds[i] = d.Embeds[i].MarshallToLibraryMessageSend()
-	}
-
-	return &discordgo.MessageEdit{
-		ID:      id,
-		Channel: channel,
-		Content: &d.Content,
-		Embeds:  embeds,
-		AllowedMentions: &discordgo.MessageAllowedMentions{
-			Parse: []discordgo.AllowedMentionType{
-				discordgo.AllowedMentionTypeUsers,
-				discordgo.AllowedMentionTypeRoles,
-			},
-		},
-	}
-}
-
-type DiscordMessage struct {
-	Id                         string                  `bson:"_id,omitempty"`
-	DiscordId                  string                  `bson:"discord_id"`
-	LastClientRequestPublished string                  `bson:"last_client_request_published"`
-	Versions                   []DiscordMessageVersion `bson:"versions"`
-	CreatedAt                  time.Time               `bson:"created_at"`
-}
-
 type Mongo struct {
 	Client   *mongo.Client
 	database string
 }
 
+/**
+ * Create a new mongo connection
+ */
 func NewMongo() (*Mongo, error) {
 	mongoUri := fmt.Sprintf(
 		"mongodb://%s:%s@%s:%s",
@@ -244,6 +111,9 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.CreateRe
 	return res.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
+/**
+ * Publish a discord message to the database
+ */
 func (m *Mongo) PublishMessageVersion(clientRequestId string, message *pb.UpdateRequest) error {
 	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -273,6 +143,10 @@ func (m *Mongo) PublishMessageVersion(clientRequestId string, message *pb.Update
 	return nil
 }
 
+/**
+ * Update the message with the discord id and the last publish request id, so we avoid publishing the same message twice.
+ * Called when the message is published to discord for the first time.
+ */
 func (m *Mongo) UpdateMessageWithDiscordIdAndLastPublishRequest(id string, discordId string, requestId string) error {
 	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -297,6 +171,10 @@ func (m *Mongo) UpdateMessageWithDiscordIdAndLastPublishRequest(id string, disco
 	return nil
 }
 
+/**
+ * Update the message with the last publish request id, so we avoid publishing the same message twice.
+ * Called when the message is published to discord for subsequent times.
+ */
 func (m *Mongo) UpdateMessageWithLastPublishRequest(id string, requestId string) error {
 	collection := m.Client.Database(m.database).Collection("discord_messages")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -370,12 +248,18 @@ func (m *Mongo) GetDiscordMessageByClientRequestId(clientRequestId string) (*Dis
 	return &result, nil
 }
 
+/**
+ * Pings the mongo database to check if it is up.
+ */
 func (m *Mongo) Ping() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return m.Client.Ping(ctx, nil)
 }
 
+/**
+ * Disconnects from the mongo database.
+ */
 func (m *Mongo) Disconnect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

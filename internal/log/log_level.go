@@ -4,6 +4,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+/**
+ * Given a string representation of a log level, return the logrus log level
+ * that corresponds to it.
+ */
 func EnvToLogLevel(envLevel string) log.Level {
 	switch envLevel {
 	case "TRACE":

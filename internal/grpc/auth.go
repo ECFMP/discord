@@ -25,6 +25,9 @@ type JwtAuthInterceptor struct {
 
 type NullInterceptor struct{}
 
+/**
+ * NewJwtAuthInterceptor creates a new AuthInterceptor.
+ */
 func NewJwtAuthInterceptor(publicKey []byte, keyAudience string) *JwtAuthInterceptor {
 	publicKeyFromPem, err := jwt.ParseRSAPublicKeyFromPEM(publicKey)
 	if err != nil {
@@ -37,6 +40,10 @@ func NewJwtAuthInterceptor(publicKey []byte, keyAudience string) *JwtAuthInterce
 	}
 }
 
+/**
+ * NewNullInterceptor creates a new NullInterceptor.
+ * This interceptor does not perform any authentication.
+ */
 func NewNullInterceptor() *NullInterceptor {
 	return &NullInterceptor{}
 }
@@ -45,6 +52,9 @@ func (interceptor *NullInterceptor) AuthInterceptor(ctx context.Context, req int
 	return handler(ctx, req)
 }
 
+/**
+ * validateJwt validates the JWT passed in the request metadata.
+ */
 func (interceptor *JwtAuthInterceptor) validateJwt(passedJwt string) (bool, error) {
 	token, err := jwt.Parse(passedJwt, func(token *jwt.Token) (interface{}, error) {
 		return interceptor.publicKey, nil
@@ -61,6 +71,12 @@ func (interceptor *JwtAuthInterceptor) validateJwt(passedJwt string) (bool, erro
 	return true, nil
 }
 
+/**
+ * AuthInterceptor is a gRPC interceptor that checks for a valid JWT in the
+ * request metadata. If the JWT is valid, the request is passed to the handler
+ * function. If the JWT is invalid, the request is rejected with an
+ * Unauthenticated error.
+ */
 func (interceptor *JwtAuthInterceptor) AuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	// Check the request type, if its healthcheck, no auth required
 	switch req.(type) {
