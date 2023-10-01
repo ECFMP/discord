@@ -19,7 +19,7 @@ var logLevelTest = []struct{
 	{"UNKOWN", logger.FatalLevel},
 }
 
-funct TestEnvToLogLevel(t *testing.T) {
+func TestEnvToLogLevel(t *testing.T) {
 	for _, tt := range logLevelTest {
 		t.Run(tt.in, func(t *testing.T) {
 			actual := log.EnvToLogLevel(tt.in)
