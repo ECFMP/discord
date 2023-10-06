@@ -4,7 +4,7 @@ import (
 	"context"
 	db "ecfmp/discord/internal/db"
 	discord "ecfmp/discord/internal/discord"
-	pb "ecfmp/discord/proto/discord"
+	pb "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
 	"testing"
 
 	log "github.com/sirupsen/logrus"

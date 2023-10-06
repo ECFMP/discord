@@ -4,8 +4,8 @@ import (
 	"context"
 	db "ecfmp/discord/internal/db"
 	"ecfmp/discord/internal/discord"
-	pb_discord "ecfmp/discord/proto/discord"
-	pb_health "ecfmp/discord/proto/health"
+	pb_discord "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
+	pb_health "ecfmp/discord/proto/health/gen/pb-go/ecfmp.vatsim.net/grpc/health"
 	"fmt"
 	"net"
 

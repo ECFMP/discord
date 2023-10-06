@@ -2,7 +2,7 @@ package db
 
 import (
 	"context"
-	pb "ecfmp/discord/proto/discord"
+	pb "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
 	"fmt"
 	"os"
 	"time"

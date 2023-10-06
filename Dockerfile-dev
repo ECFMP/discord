@@ -1,9 +1,7 @@
-FROM golang:1.21-alpine AS builder_base
+ARG GO_VERSION
+FROM golang:${GO_VERSION}-alpine AS builder_base
 
 WORKDIR /app
-
-# Install make and protobuf
-RUN apk add --no-cache protobuf make
 
 # Install GRPC health probe
 RUN set -ex \
@@ -15,10 +13,6 @@ RUN set -ex \
 RUN adduser -u1000 -D appuser
 
 USER appuser
-
-# Install go packages for proto
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
 
 FROM builder_base AS testing
 

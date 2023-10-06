@@ -1,13 +1,8 @@
 # This stage copies all the files we need into
-FROM golang:1.21-alpine AS builder
+ARG GO_VERSION
+FROM golang:${GO_VERSION}-alpine AS builder
 
 WORKDIR /app
-
-# Building profobuf
-COPY proto ./proto
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
-RUN apk add --no-cache protobuf make
 
 # Install gRPC Health Probe
 RUN set -ex \
@@ -21,9 +16,6 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY proto ./proto
-
-# Building the proto files
-RUN (cd proto && make discord && make health)
 
 # Do the build
 RUN go build -o /cmd/ecfmp-discord ./cmd/ecfmp-discord

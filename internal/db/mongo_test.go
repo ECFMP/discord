@@ -3,7 +3,7 @@ package db_test
 import (
 	"context"
 	db "ecfmp/discord/internal/db"
-	pb "ecfmp/discord/proto/discord"
+	pb "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
 	"testing"
 	"time"
 

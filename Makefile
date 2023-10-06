@@ -1,6 +1,13 @@
+GO_VERSION = 1.21
+
 test:
 	docker compose exec go_testing go test -v ./...
 
 protobuf:
-	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative ./proto/discord/discord.proto
-	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative ./proto/health/health.proto
+	cd proto && make discord_proto && make health_proto
+
+build_production:
+	protobuf build_production_container
+
+build_production_container:
+	docker build . --target production --build-arg GO_VERSION=$(GO_VERSION)
