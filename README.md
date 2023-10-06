@@ -1,4 +1,4 @@
-# discord
+# ECFMP Discord
 
 ECFMP Discord Service
 
