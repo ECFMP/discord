@@ -15,11 +15,10 @@ services:
       MONGO_DB: ecfmp
       MONGO_HOST: mongodb
       MONGO_PORT: 27017
-      DISCORD_CHANNEL_ID: ${DISCORD_CHANNEL_ID} # This is the testing webhook channel
-      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       AUTH_JWT_PUBLIC_KEY_FILE: "./docker/dev_public_key.pub"
       AUTH_JWT_AUDIENCE: "ecfmp-discord-dev"
       LOG_LEVEL: "TRACE"
+      ENV_FILE: "./.env"
     ports:
       - "8080:80"
     volumes:
