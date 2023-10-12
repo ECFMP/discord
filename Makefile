@@ -1,7 +1,7 @@
 GO_VERSION = 1.21
 
 test:
-	docker compose exec go_testing go test -v ./...
+	docker compose exec discord go test -v ./...
 
 protobuf:
 	cd proto && make discord_proto && make health_proto

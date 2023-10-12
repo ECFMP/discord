@@ -1,14 +1,39 @@
-# This stage copies all the files we need into
+# Base stage, sets up the GRPC Health Probe, we use a ubuntu image because no devcontainer features work on alpine
 ARG GO_VERSION
-FROM golang:${GO_VERSION}-alpine AS builder
+FROM golang:${GO_VERSION} AS builder_base
 
 WORKDIR /app
 
 # Install gRPC Health Probe
 RUN set -ex \
-    && apk add --no-cache curl \
     && curl -fSL https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.19/grpc_health_probe-linux-amd64 -o /usr/local/bin/grpc_health_probe \
     && chmod +x /usr/local/bin/grpc_health_probe
+
+#######################################################
+# Builds the development container
+FROM builder_base AS development
+
+# We listen on port 80 in development
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 CMD [ "grpc_health_probe", "-addr", "localhost:80", "-connect-timeout", "250ms", "-rpc-timeout", "100ms" ]
+
+# Create the user
+RUN adduser --uid 1000 appuser
+
+USER appuser
+
+# Install Air for live reloading
+RUN go install github.com/cosmtrek/air@latest
+
+ENTRYPOINT ["./docker/dev-container.sh"]
+
+#######################################################
+# Builds the production binary
+FROM golang:${GO_VERSION}-alpine AS builder_production
+
+WORKDIR /app 
 
 # Go dependencies
 COPY go.mod go.sum ./
@@ -18,22 +43,26 @@ COPY internal ./internal
 COPY proto ./proto
 
 # Do the build
-RUN go build -o /cmd/ecfmp-discord ./cmd/ecfmp-discord
+RUN go build -o ecfmp-discord ./cmd/ecfmp-discord
+
+# Make sure the binary is executable
+RUN chmod +x ecfmp-discord
 
 #######################################################
-
 # This container runs the actual binary in production
-FROM alpine:3.14 as production
+FROM alpine:3.18 as production
 
-COPY --from=builder /cmd/ecfmp-discord /ecfmp-discord
+# Create the user
+RUN adduser -u1000 -D appuser
+
+COPY --from=builder_production --chown=appuser:appuser ./app/ecfmp-discord /ecfmp-discord
+COPY --from=builder_base /usr/local/bin/grpc_health_probe /usr/local/bin/grpc_health_probe
 
 EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 CMD [ "grpc_health_probe", "-addr", "localhost:80", "-connect-timeout", "250ms", "-rpc-timeout", "100ms" ]
 
-# Create the user
-RUN adduser -u1000 -D appuser
 USER appuser
 
-CMD [ "/ecfmp-discord" ]
+ENTRYPOINT [ "/ecfmp-discord" ]

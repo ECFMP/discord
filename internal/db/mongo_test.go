@@ -6,6 +6,7 @@ import (
 	pb "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
 	"testing"
 	"time"
+	"os"
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,7 +20,7 @@ func SetupTest(t *testing.T) func(tb testing.TB) {
 		t.Errorf("Failed to connect to mongo: %v", err)
 	}
 
-	mongo.Client.Database("ecfmp_test").Collection("discord_messages").Drop(context.Background())
+	mongo.Client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages").Drop(context.Background())
 
 	return func(tb testing.TB) {
 		mongo.Client.Disconnect(context.Background())
@@ -72,7 +73,7 @@ func Test_ItWritesADiscordMessage(t *testing.T) {
 
 	// Check the database
 	var result db.DiscordMessage
-	err = mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), map[string]string{"versions.client_request_id": "1"}).Decode(&result)
+	err = mongo.Client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages").FindOne(context.Background(), map[string]string{"versions.client_request_id": "1"}).Decode(&result)
 	assert.Nil(t, err)
 	assert.Equal(t, id, result.Id)
 	assert.GreaterOrEqual(t, result.CreatedAt.Unix(), time.Now().Unix()-5)
@@ -237,7 +238,7 @@ func Test_ItUpdatesMessageById(t *testing.T) {
 	// Then
 	objectId, _ := primitive.ObjectIDFromHex(id)
 	var result db.DiscordMessage
-	err = mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&result)
+	err = mongo.Client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages").FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&result)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(result.Versions))
 	assert.Equal(t, "1", result.Versions[0].ClientRequestId)
@@ -312,7 +313,7 @@ func Test_ItUpdatesAMessageWithDiscordIdAndPublishedId(t *testing.T) {
 	// Then
 	objectId, _ := primitive.ObjectIDFromHex(id)
 	var result db.DiscordMessage
-	err := mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&result)
+	err := mongo.Client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages").FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&result)
 	assert.Nil(t, err)
 	assert.Equal(t, "discord-id", result.DiscordId)
 	assert.Equal(t, "another-request-id", result.LastClientRequestPublished)
@@ -338,7 +339,7 @@ func Test_ItUpdatesAMessageWithPublishedId(t *testing.T) {
 	// Then
 	objectId, _ := primitive.ObjectIDFromHex(id)
 	var result db.DiscordMessage
-	err := mongo.Client.Database("ecfmp_test").Collection("discord_messages").FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&result)
+	err := mongo.Client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages").FindOne(context.Background(), bson.M{"_id": objectId}).Decode(&result)
 	assert.Nil(t, err)
 	assert.Equal(t, "another-request-id", result.LastClientRequestPublished)
 }
