@@ -4,7 +4,8 @@ import (
 	"context"
 	db "ecfmp/discord/internal/db"
 	discord "ecfmp/discord/internal/discord"
-	pb "ecfmp/discord/proto/discord"
+	pb "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
+	"os"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -46,7 +47,7 @@ func SetupTest(t *testing.T) (*TestMongo, *MockDiscord, *discord.DiscordSchedule
 		t.Errorf("Failed to connect to mongo: %v", err)
 	}
 
-	mongo.Client.Database("ecfmp_test").Collection("discord_messages").Drop(context.Background())
+	mongo.Client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages").Drop(context.Background())
 
 	mockDiscord := &MockDiscord{}
 	scheduler := discord.NewDiscordScheduler(mongo, mockDiscord)

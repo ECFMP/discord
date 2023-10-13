@@ -9,12 +9,25 @@ import (
 
 	logConfig "ecfmp/discord/internal/log"
 
+	dotenv "github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
 	// Set the logging level
 	log.SetLevel(logConfig.EnvToLogLevel(os.Getenv("LOG_LEVEL")))
+
+	// If there's an env file in the environment variables, load it
+	envFile := os.Getenv("ENV_FILE")
+	if envFile != "" {
+		log.Infof("Loading environment variables from %v", envFile)
+		envLoadErr := dotenv.Load(envFile)
+		if envLoadErr != nil {
+			log.Fatalf("Failed to load environment variables from %v: %v", envFile, envLoadErr)
+		}
+
+		log.Infof("Successfully loaded environment variables from %v", envFile)
+	}
 
 	listener, err := net.Listen("tcp", ":80")
 	if err != nil {

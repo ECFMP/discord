@@ -1,7 +1,7 @@
 package db
 
 import (
-	pb "ecfmp/discord/proto/discord"
+	pb "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
 	"time"
 
 	discordgo "github.com/bwmarrin/discordgo"

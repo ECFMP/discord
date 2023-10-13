@@ -4,9 +4,10 @@ import (
 	"context"
 	db "ecfmp/discord/internal/db"
 	ecfmp_grpc "ecfmp/discord/internal/grpc"
-	pb_discord "ecfmp/discord/proto/discord"
-	pb_health "ecfmp/discord/proto/health"
+	pb_discord "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
+	pb_health "ecfmp/discord/proto/health/gen/pb-go/ecfmp.vatsim.net/grpc/health"
 	"net"
+	"os"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -49,7 +50,7 @@ func SetupTest(t *testing.T, realInterceptor bool) (TestMongo, *MockScheduler) {
 		t.Errorf("Failed to connect to mongo: %v", err)
 	}
 
-	mongo.Client.Database("ecfmp_test").Collection("discord_messages").Drop(context.Background())
+	mongo.Client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages").Drop(context.Background())
 
 	// Mock scheduler
 	scheduler := &MockScheduler{}
@@ -158,6 +159,67 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 	assert.Equal(t, 1, len(mongoMessage.Versions))
 	assert.Equal(t, "my-client-request-id", mongoMessage.Versions[0].ClientRequestId)
 	assert.Equal(t, "Hello World!", mongoMessage.Versions[0].Content)
+	assert.Equal(t, "Hello World!", mongoMessage.Versions[0].Embeds[0].Title)
+	assert.Equal(t, "This is a test", mongoMessage.Versions[0].Embeds[0].Description)
+	assert.Equal(t, "https://example.com", mongoMessage.Versions[0].Embeds[0].Url)
+	assert.Equal(t, int32(123456), mongoMessage.Versions[0].Embeds[0].Color)
+	assert.Equal(t, "Field 1", mongoMessage.Versions[0].Embeds[0].Fields[0].Name)
+	assert.Equal(t, "Value 1", mongoMessage.Versions[0].Embeds[0].Fields[0].Value)
+	assert.Equal(t, true, mongoMessage.Versions[0].Embeds[0].Fields[0].Inline)
+	assert.Equal(t, "Field 2", mongoMessage.Versions[0].Embeds[0].Fields[1].Name)
+	assert.Equal(t, "Value 2", mongoMessage.Versions[0].Embeds[0].Fields[1].Value)
+	assert.Equal(t, false, mongoMessage.Versions[0].Embeds[0].Fields[1].Inline)
+
+	assert.Equal(t, 1, scheduler.callCount)
+	assert.Equal(t, responseId, scheduler.callId)
+}
+
+func Test_ItCreatesADiscordMessageWithNoContent(t *testing.T) {
+	mongo, scheduler := SetupTest(t, false)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Create(
+		ctx,
+		&pb_discord.CreateRequest{
+			Content: "",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		})
+
+	assert.Nil(t, err)
+	responseId := resp.GetId()
+	mongoMessage, err := mongo.client.GetDiscordMessageById(responseId)
+
+	assert.Nil(t, err)
+	assert.Equal(t, responseId, mongoMessage.Id)
+	assert.Equal(t, 1, len(mongoMessage.Versions))
+	assert.Equal(t, "my-client-request-id", mongoMessage.Versions[0].ClientRequestId)
+	assert.Equal(t, "", mongoMessage.Versions[0].Content)
 	assert.Equal(t, "Hello World!", mongoMessage.Versions[0].Embeds[0].Title)
 	assert.Equal(t, "This is a test", mongoMessage.Versions[0].Embeds[0].Description)
 	assert.Equal(t, "https://example.com", mongoMessage.Versions[0].Embeds[0].Url)
@@ -318,22 +380,6 @@ func Test_ItRejectsRequestsThatHaveAnEmptyClientRequestId(t *testing.T) {
 	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
 	resp, err := client.Create(ctx, &pb_discord.CreateRequest{Content: "Hello, world!"})
 	assert.Equal(t, err, status.Error(codes.InvalidArgument, "x-client-request-id metadata is required"))
-	assert.Nil(t, resp)
-
-	assert.Equal(t, 0, scheduler.callCount)
-}
-
-func Test_ItRejectsRequestsThatDontHaveContent(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
-	defer mongo.tearDown()
-
-	grpcClient := setupGrpcClient()
-	defer grpcClient.close()
-
-	client := pb_discord.NewDiscordClient(grpcClient.conn)
-
-	resp, err := client.Create(context.Background(), &pb_discord.CreateRequest{})
-	assert.Equal(t, err, status.Error(codes.InvalidArgument, "Content is required"))
 	assert.Nil(t, resp)
 
 	assert.Equal(t, 0, scheduler.callCount)
@@ -521,6 +567,74 @@ func Test_ItUpdatesAMessage(t *testing.T) {
 	assert.Equal(t, mongoId, scheduler.callId)
 }
 
+func Test_ItUpdatesAMessageWithNoContent(t *testing.T) {
+	mongo, scheduler := SetupTest(t, false)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id-2")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	_, err := client.Update(
+		ctx,
+		&pb_discord.UpdateRequest{
+			Id:      mongoId,
+			Content: "",
+
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		},
+	)
+
+	assert.Nil(t, err)
+
+	// Then
+	mongoMessage, err := mongo.client.GetDiscordMessageById(mongoId)
+	assert.Nil(t, err)
+	assert.Equal(t, mongoId, mongoMessage.Id)
+	assert.Equal(t, 2, len(mongoMessage.Versions))
+	assert.Equal(t, "my-client-request-id", mongoMessage.Versions[0].ClientRequestId)
+	assert.Equal(t, "Hello, world!", mongoMessage.Versions[0].Content)
+	assert.Equal(t, "my-client-request-id-2", mongoMessage.Versions[1].ClientRequestId)
+	assert.Equal(t, "", mongoMessage.Versions[1].Content)
+	assert.Equal(t, "Hello World!", mongoMessage.Versions[1].Embeds[0].Title)
+	assert.Equal(t, "This is a test", mongoMessage.Versions[1].Embeds[0].Description)
+	assert.Equal(t, "https://example.com", mongoMessage.Versions[1].Embeds[0].Url)
+	assert.Equal(t, int32(123456), mongoMessage.Versions[1].Embeds[0].Color)
+	assert.Equal(t, "Field 1", mongoMessage.Versions[1].Embeds[0].Fields[0].Name)
+	assert.Equal(t, "Value 1", mongoMessage.Versions[1].Embeds[0].Fields[0].Value)
+	assert.Equal(t, true, mongoMessage.Versions[1].Embeds[0].Fields[0].Inline)
+	assert.Equal(t, "Field 2", mongoMessage.Versions[1].Embeds[0].Fields[1].Name)
+	assert.Equal(t, "Value 2", mongoMessage.Versions[1].Embeds[0].Fields[1].Value)
+	assert.Equal(t, false, mongoMessage.Versions[1].Embeds[0].Fields[1].Inline)
+
+	assert.Equal(t, 1, scheduler.callCount)
+	assert.Equal(t, mongoId, scheduler.callId)
+}
+
 func Test_ItUpdatesAMessageIfAuthenticated(t *testing.T) {
 	mongo, _ := SetupTest(t, true)
 	defer mongo.tearDown()
@@ -642,27 +756,6 @@ func Test_ItDoesntUpdateAMessageNotFound(t *testing.T) {
 
 	assert.NotNil(t, err)
 	assert.Equal(t, status.Error(codes.NotFound, codes.NotFound.String()), err)
-
-	assert.Equal(t, 0, scheduler.callCount)
-}
-
-func Test_ItDoesntUpdateAMessageNoContent(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
-	defer mongo.tearDown()
-
-	grpcClient := setupGrpcClient()
-	defer grpcClient.close()
-
-	client := pb_discord.NewDiscordClient(grpcClient.conn)
-
-	mongoId, _ := mongo.client.WriteDiscordMessage("my-client-request-id", &pb_discord.CreateRequest{Content: "Hello, world!"})
-
-	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id-2")
-	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
-	_, err := client.Update(ctx, &pb_discord.UpdateRequest{Id: mongoId, Content: ""})
-
-	assert.NotNil(t, err)
-	assert.Equal(t, status.Error(codes.InvalidArgument, "Content is required"), err)
 
 	assert.Equal(t, 0, scheduler.callCount)
 }

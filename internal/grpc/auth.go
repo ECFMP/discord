@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 	"crypto/rsa"
-	grpc_health "ecfmp/discord/proto/health"
+	grpc_health "ecfmp/discord/proto/health/gen/pb-go/ecfmp.vatsim.net/grpc/health"
 
 	log "github.com/sirupsen/logrus"
 

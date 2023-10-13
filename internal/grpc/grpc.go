@@ -4,8 +4,8 @@ import (
 	"context"
 	db "ecfmp/discord/internal/db"
 	"ecfmp/discord/internal/discord"
-	pb_discord "ecfmp/discord/proto/discord"
-	pb_health "ecfmp/discord/proto/health"
+	pb_discord "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
+	pb_health "ecfmp/discord/proto/health/gen/pb-go/ecfmp.vatsim.net/grpc/health"
 	"fmt"
 	"net"
 
@@ -77,10 +77,6 @@ func validateEmbedFields(embeds []*pb_discord.DiscordEmbeds) error {
  */
 func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) (*pb_discord.CreateResponse, error) {
 	log.Debug("Create request received")
-	if in.GetContent() == "" {
-		log.Warning("Invalid create request: Content is required")
-		return nil, status.Error(codes.InvalidArgument, "Content is required")
-	}
 
 	// Check if the message has already been written, and return the existing id if so
 	clientRequestId, requestIdErr := getClientRequestId(ctx)
@@ -128,11 +124,6 @@ func (server *server) Update(ctx context.Context, in *pb_discord.UpdateRequest) 
 	if in.GetId() == "" {
 		log.Warning("Invalid update request: Id is required")
 		return nil, status.Error(codes.InvalidArgument, "Id is required")
-	}
-
-	if in.GetContent() == "" {
-		log.Warning("Invalid update request: Content is required")
-		return nil, status.Error(codes.InvalidArgument, "Content is required")
 	}
 
 	// Validate the embed fields

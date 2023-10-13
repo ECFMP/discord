@@ -16,30 +16,14 @@ jobs:
           token: ${{ secrets.PROTOBUF_TOKEN }}
           submodules: true
 
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.21
-
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v2
-
-      - name: Check Protoc version
-        run: protoc --version
-
-      - name: Install Go Proto Packages
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-      - name: Make Protobuf
+      - name: Build Protobuf
         run: make protobuf
 
-      - name: Start containers
-        run: docker compose up -d --build --wait go_testing mongodb
+      - name: Start Containers
+        run: docker compose --file docker-compose-ci.yml up --build -d --wait --wait-timeout 30
 
       - name: Run Tests
-        run: make test
+        run: docker compose exec go_testing go test -v ./...
 
   format:
     runs-on: ubuntu-latest
@@ -59,24 +43,20 @@ jobs:
           token: ${{ secrets.PROTOBUF_TOKEN }}
           submodules: true
 
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.21
-
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v2
-
-      - name: Check Protoc version
-        run: protoc --version
-
-      - name: Install Go Proto Packages
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-      - name: Make Protobuf
+      - name: Build Protobuf
         run: make protobuf
 
       - name: Vet
         run: go vet ./...
+
+  build-production:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PROTOBUF_TOKEN }}
+          submodules: true
+
+      - name: Build Production Container
+        run: make build_production

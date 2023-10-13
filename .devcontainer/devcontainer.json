@@ -1,0 +1,56 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-docker-compose
+{
+	"name": "ECFMP Discord Docker Compose",
+	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
+	// The .devcontainer/docker-compose.yml file contains any overrides you need/want to make.
+	"dockerComposeFile": [
+		"../docker-compose.yml",
+	],
+	// The 'service' property is the name of the service for the container that VS Code should
+	// use. Update this value and .devcontainer/docker-compose.yml to the real service name.
+	"service": "discord",
+	// The optional 'workspaceFolder' property is the path VS Code should open by default when
+	// connected. This is typically a file mount in .devcontainer/docker-compose.yml
+	"workspaceFolder": "/app",
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	"forwardPorts": [
+		3000,
+		8080
+	],
+	// Features
+	"features": {
+		// git
+		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/itsmechlark/features/1password:1": {}
+	},
+	// Uncomment the next line if you want start specific services in your Docker Compose config.
+	// "runServices": [],
+	// Uncomment the next line if you want to keep your containers running after VS Code shuts down.
+	// "shutdownAction": "none",
+	// Uncomment the next line to run commands after the container is created.
+	"onCreateCommand": "go install -v golang.org/x/tools/gopls@latest",
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"editor.formatOnSave": true,
+				"files.insertFinalNewline": true,
+				"go.useLanguageServer": true,
+				"go.languageServerExperimentalFeatures": {
+					"documentLink": true
+				}
+			},
+			"extensions": [
+				"ms-azuretools.vscode-docker",
+				"golang.go",
+				"GitHub.copilot",
+				"ms-vscode.makefile-tools",
+				"github.vscode-github-actions"
+			]
+		}
+	}
+	// Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "devcontainer"
+}
