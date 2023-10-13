@@ -43,7 +43,7 @@ COPY internal ./internal
 COPY proto ./proto
 
 # Do the build
-RUN go build -o ecfmp-discord ./cmd/ecfmp-discord
+RUN go build -buildvcs=false -o ecfmp-discord ./cmd/ecfmp-discord
 
 # Make sure the binary is executable
 RUN chmod +x ecfmp-discord
