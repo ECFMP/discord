@@ -1,9 +1,9 @@
 version: '3.7'
 services:
   mongodb:
-  extends:
-    file: docker-compose.yml
-    service: mongodb
+    extends:
+      file: docker-compose.yml
+      service: mongodb
 
   go_testing:
     build:
