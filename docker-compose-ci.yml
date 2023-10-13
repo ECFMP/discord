@@ -10,6 +10,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: testing
+      args:
+        - GO_VERSION=1.21
     depends_on:
       - mongodb
     environment:
