@@ -22,17 +22,11 @@ jobs:
       - name: Copy Env
         run: cp .env.example .env
 
-      - name: Start Mongodb Container
-        run: docker run -d -p 27017:27017 --name mongodb mongo:6.0
-
-      - name: Build Test Container
-        run: docker build -t go_test -f Dockerfile . --target builder_test --build-arg GO_VERSION=1.21
-
-      - name: Start Test Container
-        run: docker run -d -p 8080:8080 --name go_test --link mongodb go_test
+      - name: Start Containers
+        run: docker compose up --build -f docker-compose-ci.yml -d --wait --wait-timeout 30
 
       - name: Run Tests
-        run: docker exec -it go_test go test -v ./...
+        run: docker compose exec go_testing go test -v ./...
 
   format:
     runs-on: ubuntu-latest
