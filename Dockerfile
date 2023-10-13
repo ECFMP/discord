@@ -46,7 +46,7 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY proto ./proto
-COPY ./docker/test-container.sh ./docker/test-container.sh
+COPY --chmod=+x ./docker/test-container.sh ./docker/test-container.sh
 
 # We check if a file exists in /tmp/health.txt to see if the container is healthy
 HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=10 CMD [ "sh", "-c", "[ -f /tmp/health.txt ]"]
