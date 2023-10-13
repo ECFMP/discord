@@ -19,9 +19,6 @@ jobs:
       - name: Build Protobuf
         run: make protobuf
 
-      - name: Copy Env
-        run: cp .env.example .env
-
       - name: Start Containers
         run: docker compose --file docker-compose-ci.yml up --build -d --wait --wait-timeout 30
 
