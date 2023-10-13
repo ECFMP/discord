@@ -23,7 +23,7 @@ jobs:
         run: cp .env.example .env
 
       - name: Start Containers
-        run: docker compose up --build --file docker-compose-ci.yml -d --wait --wait-timeout 30
+        run: docker compose --file docker-compose-ci.yml up --build -d --wait --wait-timeout 30
 
       - name: Run Tests
         run: docker compose exec go_testing go test -v ./...
