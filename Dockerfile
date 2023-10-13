@@ -40,14 +40,6 @@ RUN adduser -u1000 -D appuser
 
 USER appuser
 
-# Go dependencies
-COPY go.mod go.sum ./
-RUN go mod download
-COPY cmd ./cmd
-COPY internal ./internal
-COPY proto ./proto
-COPY --chmod=+x ./docker/test-container.sh ./docker/test-container.sh
-
 # We check if a file exists in /tmp/health.txt to see if the container is healthy
 HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=10 CMD [ "sh", "-c", "[ -f /tmp/health.txt ]"]
 
