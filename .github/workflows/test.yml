@@ -25,8 +25,8 @@ jobs:
       - name: Start Mongodb Container
         run: docker run -d -p 27017:27017 --name mongodb mongo:6.0
 
-      - name: Build Test Container # Called builder_test in Dockerfile, without compose
-        run: docker build -t go_test -f Dockerfile . --target builder_test
+      - name: Build Test Container # Called builder_test in Dockerfile, without compose, env var GO_VERSION = 1.21
+        run: docker build -t go_test -f Dockerfile . --target builder_test --build-arg GO_VERSION=1.21
 
       - name: Start Test Container
         run: docker run -d -p 8080:8080 --name go_test --link mongodb go_test
