@@ -25,6 +25,16 @@ jobs:
       - name: Start containers
         run: docker compose up -d --build --wait discord mongodb
 
+      # Collect logs from the discord container even if it fails
+      - name: Collect Logs
+        if: ${{ always() }}
+        run: docker logs discord
+
+      # Collect logs from the mongodb container even if it fails
+      - name: Collect Logs
+        if: ${{ always() }}
+        run: docker logs mongodb
+
       - name: Run Tests
         run: make test
 
