@@ -28,7 +28,7 @@ jobs:
       # Collect logs from the discord container even if it fails
       - name: Collect Logs
         if: ${{ always() }}
-        run: docker logs
+        run: docker-compose logs --tail=500
 
       - name: Run Tests
         run: make test
