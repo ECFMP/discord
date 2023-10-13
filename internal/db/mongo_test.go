@@ -4,9 +4,9 @@ import (
 	"context"
 	db "ecfmp/discord/internal/db"
 	pb "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
+	"os"
 	"testing"
 	"time"
-	"os"
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -41,6 +41,7 @@ func Test_ItWritesADiscordMessage(t *testing.T) {
 	id, err := mongo.WriteDiscordMessage(
 		"1",
 		&pb.CreateRequest{
+			Channel: "123",
 			Content: "Hello World!",
 			Embeds: []*pb.DiscordEmbeds{
 				{
@@ -76,6 +77,7 @@ func Test_ItWritesADiscordMessage(t *testing.T) {
 	err = mongo.Client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages").FindOne(context.Background(), map[string]string{"versions.client_request_id": "1"}).Decode(&result)
 	assert.Nil(t, err)
 	assert.Equal(t, id, result.Id)
+	assert.Equal(t, "123", result.Channel)
 	assert.GreaterOrEqual(t, result.CreatedAt.Unix(), time.Now().Unix()-5)
 	assert.LessOrEqual(t, result.CreatedAt.Unix(), time.Now().Unix())
 	assert.Equal(t, 1, len(result.Versions))

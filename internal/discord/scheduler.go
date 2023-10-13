@@ -2,8 +2,9 @@ package discord
 
 import (
 	db "ecfmp/discord/internal/db"
-	log "github.com/sirupsen/logrus"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Scheduler interface {
@@ -81,7 +82,7 @@ func (d *DiscordScheduler) processChannel() {
  */
 func publishNewMessage(d *DiscordScheduler, mongoMessage *db.DiscordMessage) {
 	versionToPublish := &mongoMessage.Versions[len(mongoMessage.Versions)-1]
-	discordId, publishErr := d.discord.PublishMessage(versionToPublish)
+	discordId, publishErr := d.discord.PublishMessage(mongoMessage.Channel, versionToPublish)
 
 	if publishErr != nil {
 		log.Errorf("Scheduler: Failed to publish message to discord: %v", publishErr)
@@ -104,7 +105,7 @@ func publishNewMessage(d *DiscordScheduler, mongoMessage *db.DiscordMessage) {
  */
 func publishMessageUpdate(d *DiscordScheduler, mongoMessage *db.DiscordMessage) {
 	versionToPublish := &mongoMessage.Versions[len(mongoMessage.Versions)-1]
-	updateErr := d.discord.UpdateMessage(versionToPublish, mongoMessage.DiscordId)
+	updateErr := d.discord.UpdateMessage(mongoMessage.Channel, versionToPublish, mongoMessage.DiscordId)
 	if updateErr != nil {
 		log.Errorf("Scheduler: Failed to update message: %v", updateErr)
 		return

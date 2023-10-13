@@ -100,6 +100,7 @@ func (m *Mongo) WriteDiscordMessage(clientRequestId string, message *pb.CreateRe
 		CreatedAt:       time.Now(),
 	}
 	record := DiscordMessage{
+		Channel:   message.Channel,
 		Versions:  []DiscordMessageVersion{version},
 		CreatedAt: time.Now(),
 	}
