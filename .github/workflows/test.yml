@@ -22,16 +22,17 @@ jobs:
       - name: Copy Env
         run: cp .env.example .env
 
-      - name: Start containers
-        run: docker compose up -d --build --wait discord mongodb
+      - name: Start Mongodb Container
+        run: docker run -d -p 27017:27017 --name mongodb mongo:6.0
 
-      # Collect logs from the discord container even if it fails
-      - name: Collect Logs
-        if: ${{ always() }}
-        run: docker-compose logs --tail=500
+      - name: Build Test Container # Called builder_test in Dockerfile, without compose
+        run: docker build -t go_test -f Dockerfile . --target builder_test
+
+      - name: Start Test Container
+        run: docker run -d -p 8080:8080 --name go_test --link mongodb go_test
 
       - name: Run Tests
-        run: make test
+        run: docker exec -it go_test go test -v ./...
 
   format:
     runs-on: ubuntu-latest
