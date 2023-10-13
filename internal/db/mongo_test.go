@@ -4,9 +4,9 @@ import (
 	"context"
 	db "ecfmp/discord/internal/db"
 	pb "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
+	"os"
 	"testing"
 	"time"
-	"os"
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"

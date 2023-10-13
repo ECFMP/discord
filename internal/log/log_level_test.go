@@ -1,15 +1,15 @@
 package log_test
 
 import (
-	"testing"
 	log "ecfmp/discord/internal/log"
 	logger "github.com/sirupsen/logrus"
+	"testing"
 )
 
-var logLevelTest = []struct{
-	in string
+var logLevelTest = []struct {
+	in       string
 	expected logger.Level
-} {
+}{
 	{"TRACE", logger.TraceLevel},
 	{"DEBUG", logger.DebugLevel},
 	{"INFO", logger.InfoLevel},

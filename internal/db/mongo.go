@@ -33,7 +33,7 @@ func NewMongo() (*Mongo, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUri))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUri), options.Client().SetMaxPoolSize(10), options.Client().SetMaxConnIdleTime(5*time.Second))
 	if err != nil {
 		log.Errorf("Failed to connect to mongo: %v", err)
 		return nil, err
