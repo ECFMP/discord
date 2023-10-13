@@ -127,6 +127,7 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 	resp, err := client.Create(
 		ctx,
 		&pb_discord.CreateRequest{
+			Channel: "1234567890",
 			Content: "Hello World!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
@@ -156,6 +157,7 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, responseId, mongoMessage.Id)
+	assert.Equal(t, "1234567890", mongoMessage.Channel)
 	assert.Equal(t, 1, len(mongoMessage.Versions))
 	assert.Equal(t, "my-client-request-id", mongoMessage.Versions[0].ClientRequestId)
 	assert.Equal(t, "Hello World!", mongoMessage.Versions[0].Content)
@@ -189,6 +191,7 @@ func Test_ItCreatesADiscordMessageWithNoContent(t *testing.T) {
 		ctx,
 		&pb_discord.CreateRequest{
 			Content: "",
+			Channel: "1234567890",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
 					Title:       "Hello World!",
@@ -217,6 +220,7 @@ func Test_ItCreatesADiscordMessageWithNoContent(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, responseId, mongoMessage.Id)
+	assert.Equal(t, "1234567890", mongoMessage.Channel)
 	assert.Equal(t, 1, len(mongoMessage.Versions))
 	assert.Equal(t, "my-client-request-id", mongoMessage.Versions[0].ClientRequestId)
 	assert.Equal(t, "", mongoMessage.Versions[0].Content)
@@ -252,6 +256,7 @@ func Test_ItAllowsCreateIfAuthenticated(t *testing.T) {
 	resp, err := client.Create(
 		ctx,
 		&pb_discord.CreateRequest{
+			Channel: "1234567890",
 			Content: "Hello World!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
@@ -302,6 +307,7 @@ func Test_ItForbidsCreateIfNotAuthenticated(t *testing.T) {
 		ctx,
 		&pb_discord.CreateRequest{
 			Content: "Hello World!",
+			Channel: "1234567890",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
 					Title:       "Hello World!",
@@ -385,6 +391,93 @@ func Test_ItRejectsRequestsThatHaveAnEmptyClientRequestId(t *testing.T) {
 	assert.Equal(t, 0, scheduler.callCount)
 }
 
+func Test_ItRejectsAMessageThatHasMissingChannel(t *testing.T) {
+	mongo, scheduler := SetupTest(t, false)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Create(
+		ctx,
+		&pb_discord.CreateRequest{
+			Content: "Hello World!",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		})
+
+	assert.Equal(t, err, status.Error(codes.InvalidArgument, "Channel is required"))
+	assert.Nil(t, resp)
+
+	assert.Equal(t, 0, scheduler.callCount)
+}
+
+func Test_ItRejectsAMessageThatHasEmptyChannel(t *testing.T) {
+	mongo, scheduler := SetupTest(t, false)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_discord.NewDiscordClient(grpcClient.conn)
+
+	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
+	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
+	resp, err := client.Create(
+		ctx,
+		&pb_discord.CreateRequest{
+			Content: "Hello World!",
+			Channel: "",
+			Embeds: []*pb_discord.DiscordEmbeds{
+				{
+					Title:       "Hello World!",
+					Description: "This is a test",
+					Url:         "https://example.com",
+					Color:       123456,
+					Fields: []*pb_discord.DiscordEmbedsFields{
+						{
+							Name:   "Field 1",
+							Value:  "Value 1",
+							Inline: true,
+						},
+						{
+							Name:   "Field 2",
+							Value:  "Value 2",
+							Inline: false,
+						},
+					},
+				},
+			},
+		})
+
+	assert.Equal(t, err, status.Error(codes.InvalidArgument, "Channel is required"))
+	assert.Nil(t, resp)
+
+	assert.Equal(t, 0, scheduler.callCount)
+}
+
 func Test_ItRejectsAMessageThatHasMissingFieldName(t *testing.T) {
 	mongo, scheduler := SetupTest(t, false)
 	defer mongo.tearDown()
@@ -399,6 +492,7 @@ func Test_ItRejectsAMessageThatHasMissingFieldName(t *testing.T) {
 	resp, err := client.Create(
 		ctx,
 		&pb_discord.CreateRequest{
+			Channel: "1234567890",
 			Content: "Hello World!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
@@ -442,6 +536,7 @@ func Test_ItRejectsAMessageThatHasMissingFieldValue(t *testing.T) {
 	resp, err := client.Create(
 		ctx,
 		&pb_discord.CreateRequest{
+			Channel: "1234567890",
 			Content: "Hello World!",
 			Embeds: []*pb_discord.DiscordEmbeds{
 				{
@@ -926,7 +1021,7 @@ func Test_ItCanCreateThenUpdateAMessage(t *testing.T) {
 
 	grpcMetadata := metadata.Pairs("x-client-request-id", "my-client-request-id")
 	ctx := metadata.NewOutgoingContext(context.Background(), grpcMetadata)
-	resp, err := client.Create(ctx, &pb_discord.CreateRequest{Content: "Hello, world!"})
+	resp, err := client.Create(ctx, &pb_discord.CreateRequest{Channel: "123", Content: "Hello, world!"})
 
 	assert.Nil(t, err)
 	responseId := resp.GetId()
@@ -934,6 +1029,7 @@ func Test_ItCanCreateThenUpdateAMessage(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, responseId, mongoMessage.Id)
+	assert.Equal(t, "123", mongoMessage.Channel)
 	assert.Equal(t, 1, len(mongoMessage.Versions))
 	assert.Equal(t, "my-client-request-id", mongoMessage.Versions[0].ClientRequestId)
 	assert.Equal(t, "Hello, world!", mongoMessage.Versions[0].Content)

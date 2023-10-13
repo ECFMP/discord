@@ -97,6 +97,12 @@ func (server *server) Create(ctx context.Context, in *pb_discord.CreateRequest) 
 		return &pb_discord.CreateResponse{Id: existingId.Id}, nil
 	}
 
+	// Validate that the channel is set
+	if in.GetChannel() == "" {
+		log.Warning("Invalid request: channel is required")
+		return nil, status.Error(codes.InvalidArgument, "Channel is required")
+	}
+
 	// Validate the embed fields
 	embedFieldsErr := validateEmbedFields(in.Embeds)
 	if embedFieldsErr != nil {

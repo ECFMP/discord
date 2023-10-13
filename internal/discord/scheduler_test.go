@@ -14,20 +14,23 @@ import (
 
 type MockDiscord struct {
 	callCount     int
+	callChannel   string
 	callVersion   db.DiscordMessageVersion
 	callDiscordId string
 }
 
 // publishMessage implements discord.Discord.
-func (d *MockDiscord) PublishMessage(version *db.DiscordMessageVersion) (string, error) {
+func (d *MockDiscord) PublishMessage(channelId string, version *db.DiscordMessageVersion) (string, error) {
 	d.callCount++
+	d.callChannel = channelId
 	d.callVersion = *version
 	return "123", nil
 }
 
 // updateMessage implements discord.Discord.
-func (d *MockDiscord) UpdateMessage(version *db.DiscordMessageVersion, discordId string) error {
+func (d *MockDiscord) UpdateMessage(channelId string, version *db.DiscordMessageVersion, discordId string) error {
 	d.callCount++
+	d.callChannel = channelId
 	d.callVersion = *version
 	d.callDiscordId = discordId
 	return nil
@@ -65,7 +68,7 @@ func Test_ItPublishesNewMessages(t *testing.T) {
 	defer testMongo.tearDown()
 
 	// Write to mongo (as this is done before now)
-	mongoId, err := testMongo.client.WriteDiscordMessage("some-client-request-id", &pb.CreateRequest{Content: "Hello World"})
+	mongoId, err := testMongo.client.WriteDiscordMessage("some-client-request-id", &pb.CreateRequest{Channel: "channel", Content: "Hello World"})
 	if err != nil {
 		t.Errorf("Failed to write to mongo: %v", err)
 	}
@@ -79,6 +82,7 @@ func Test_ItPublishesNewMessages(t *testing.T) {
 	// Assert that the message was published to discord
 	assert.Equal(t, 1, mockDiscord.callCount)
 	assert.Equal(t, "Hello World", mockDiscord.callVersion.Content)
+	assert.Equal(t, "channel", mockDiscord.callChannel)
 
 	// Check that the message was written to mongo
 	mongoMessage, mongoErr := testMongo.client.GetDiscordMessageById(mongoId)
@@ -95,7 +99,7 @@ func Test_ItUpdatesMessagesFromVersions(t *testing.T) {
 	defer testMongo.tearDown()
 
 	// Write to mongo (as this is done before now)
-	mongoId, err := testMongo.client.WriteDiscordMessage("some-client-request-id", &pb.CreateRequest{Content: "Hello World"})
+	mongoId, err := testMongo.client.WriteDiscordMessage("some-client-request-id", &pb.CreateRequest{Channel: "channel", Content: "Hello World"})
 	if err != nil {
 		t.Errorf("Failed to write to mongo: %v", err)
 	}
@@ -113,6 +117,7 @@ func Test_ItUpdatesMessagesFromVersions(t *testing.T) {
 	assert.Equal(t, 1, mockDiscord.callCount)
 	assert.Equal(t, "Hello World", mockDiscord.callVersion.Content)
 	assert.Equal(t, "123", mockDiscord.callDiscordId)
+	assert.Equal(t, "channel", mockDiscord.callChannel)
 
 	// Check that the message was written to mongo
 	mongoMessage, mongoErr := testMongo.client.GetDiscordMessageById(mongoId)

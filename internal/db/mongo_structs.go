@@ -168,6 +168,7 @@ func (d *DiscordMessageVersion) MarshallToLibraryMessageEdit(channel string, id 
  */
 type DiscordMessage struct {
 	Id                         string                  `bson:"_id,omitempty"`
+	Channel                    string                  `bson:"channel"`
 	DiscordId                  string                  `bson:"discord_id"`
 	LastClientRequestPublished string                  `bson:"last_client_request_published"`
 	Versions                   []DiscordMessageVersion `bson:"versions"`

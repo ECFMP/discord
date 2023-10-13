@@ -49,7 +49,7 @@ func main() {
 	}()
 
 	// Create the discord publisher
-	publisher := discord.NewDiscordPublisher(os.Getenv("DISCORD_BOT_TOKEN"), os.Getenv("DISCORD_CHANNEL_ID"))
+	publisher := discord.NewDiscordPublisher(os.Getenv("DISCORD_BOT_TOKEN"))
 
 	// Create the discord scheduler
 	scheduler := discord.NewDiscordScheduler(mongo, publisher)
