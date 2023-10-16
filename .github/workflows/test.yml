@@ -99,6 +99,6 @@ jobs:
           push: true
           target: production
           build-args: |
-            --build-arg GO_VERSION=1.21.2
+            GO_VERSION=1.21
           tags: |
             andytwf/ecfmp-flow:discord-latest
