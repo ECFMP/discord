@@ -20,7 +20,7 @@ jobs:
         run: make protobuf
 
       - name: Start Containers
-        run: docker compose --file docker-compose-ci.yml up --build -d --wait --wait-timeout 30
+        run: docker compose --file docker-compose-ci.yml up --build go_testing mongodb --wait --wait-timeout 30
 
       - name: Run Tests
         run: docker compose exec go_testing go test -v ./...
@@ -49,7 +49,7 @@ jobs:
       - name: Vet
         run: go vet ./...
 
-  build-production:
+  test-production:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -58,5 +58,33 @@ jobs:
           token: ${{ secrets.PROTOBUF_TOKEN }}
           submodules: true
 
-      - name: Build Production Container
-        run: make build_production
+      - name: Build Protobuf
+        run: make protobuf
+
+      - name: Test Production Container
+        run: make test_production
+  
+  tag-production:
+    runs-on: ubuntu-latest
+    needs: [test, format, vet, test-production]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PROTOBUF_TOKEN }}
+          submodules: true
+
+      - name: Build Protobuf
+        run: make protobuf
+
+      - name: Build and Tag Production
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/amd64, linux/arm64
+          file: Dockerfile
+          push: true
+          target: production
+          tags: |
+            andytwf/ecfmp-flow:discord-latest

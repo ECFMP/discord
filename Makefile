@@ -10,3 +10,6 @@ build_production: protobuf build_production_container
 
 build_production_container:
 	docker build . --target production --build-arg GO_VERSION=$(GO_VERSION)
+
+test_production_container:
+	docker compose --file docker-compose-ci.yml up --build go_testing mongodb --wait --wait-timeout 30
