@@ -58,11 +58,14 @@ jobs:
           token: ${{ secrets.PROTOBUF_TOKEN }}
           submodules: true
 
+      - name: Copy env file
+        run: cp .env.example .env
+
       - name: Build Protobuf
         run: make protobuf
 
       - name: Test Production Container
-        run: make test_production
+        run: make test_production_container
   
   tag-production:
     runs-on: ubuntu-latest
