@@ -65,7 +65,7 @@ jobs:
         run: make protobuf
 
       - name: Test Production Container
-        run: make test_production_container
+        run: docker compose --file docker-compose-ci.yml up --build production mongodb --wait --wait-timeout 30
   
   tag-production:
     runs-on: ubuntu-latest
