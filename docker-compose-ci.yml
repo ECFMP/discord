@@ -20,8 +20,7 @@ services:
       MONGO_USERNAME: root
       MONGO_PASSWORD: example_password
       MONGO_DB: ecfmp_test
-      MONGO_HOST: mongodb
-      MONGO_PORT: 27017
+      MONGO_HOST: mongodb://mongodb:27017
       AUTH_JWT_PUBLIC_KEY_FILE: './docker/dev_public_key.pub'
       AUTH_JWT_PRIVATE_KEY_FILE: './docker/dev_private_key.pem'
       AUTH_JWT_AUDIENCE: 'ecfmp-discord-dev'
@@ -44,8 +43,7 @@ services:
       MONGO_USERNAME: root
       MONGO_PASSWORD: example_password
       MONGO_DB: ecfmp_test
-      MONGO_HOST: mongodb
-      MONGO_PORT: 27017
+      MONGO_HOST: mongodb://mongodb:27017
       AUTH_JWT_PUBLIC_KEY_FILE: './app/docker/dev_public_key.pub'
       AUTH_JWT_PRIVATE_KEY_FILE: './app/docker/dev_private_key.pem'
       AUTH_JWT_AUDIENCE: 'ecfmp-discord-dev'

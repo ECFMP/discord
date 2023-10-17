@@ -13,8 +13,7 @@ services:
       MONGO_USERNAME: root
       MONGO_PASSWORD: example_password
       MONGO_DB: ecfmp
-      MONGO_HOST: mongodb
-      MONGO_PORT: 27017
+      MONGO_HOST: mongodb://mongodb:27017
       AUTH_JWT_PUBLIC_KEY_FILE: "./docker/dev_public_key.pub"
       AUTH_JWT_AUDIENCE: "ecfmp-discord-dev"
       LOG_LEVEL: "TRACE"
@@ -46,6 +45,7 @@ services:
 
 volumes:
   mongodb_data:
+
 
 networks:
   default:
