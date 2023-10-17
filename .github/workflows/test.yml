@@ -59,7 +59,7 @@ jobs:
           submodules: true
 
       - name: Copy env file
-        run: cp .env.example .env
+        run: cp .env.dev.example .env
 
       - name: Build Protobuf
         run: make protobuf
