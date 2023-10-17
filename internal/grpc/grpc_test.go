@@ -31,6 +31,7 @@ type TestMongo struct {
 }
 
 type MockScheduler struct {
+	isReady   bool
 	callCount int
 	callId    string
 }
@@ -40,7 +41,11 @@ func (scheduler *MockScheduler) ScheduleMessage(id string) {
 	scheduler.callId = id
 }
 
-func SetupTest(t *testing.T, realInterceptor bool) (TestMongo, *MockScheduler) {
+func (scheduler *MockScheduler) Ready() bool {
+	return scheduler.isReady
+}
+
+func SetupTest(t *testing.T, realInterceptor bool, schedulerReady bool) (TestMongo, *MockScheduler) {
 	// Turn off logging except for fatals
 	log.SetLevel(log.FatalLevel)
 
@@ -53,7 +58,9 @@ func SetupTest(t *testing.T, realInterceptor bool) (TestMongo, *MockScheduler) {
 	mongo.Client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages").Drop(context.Background())
 
 	// Mock scheduler
-	scheduler := &MockScheduler{}
+	scheduler := &MockScheduler{
+		isReady: schedulerReady,
+	}
 
 	var interceptor ecfmp_grpc.AuthInterceptor
 	if realInterceptor {
@@ -114,7 +121,7 @@ func setupGrpcClient() TestClient {
 }
 
 func Test_ItCreatesADiscordMessage(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -177,7 +184,7 @@ func Test_ItCreatesADiscordMessage(t *testing.T) {
 }
 
 func Test_ItCreatesADiscordMessageWithNoContent(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -240,7 +247,7 @@ func Test_ItCreatesADiscordMessageWithNoContent(t *testing.T) {
 }
 
 func Test_ItAllowsCreateIfAuthenticated(t *testing.T) {
-	mongo, _ := SetupTest(t, true)
+	mongo, _ := SetupTest(t, true, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -289,7 +296,7 @@ func Test_ItAllowsCreateIfAuthenticated(t *testing.T) {
 }
 
 func Test_ItForbidsCreateIfNotAuthenticated(t *testing.T) {
-	mongo, _ := SetupTest(t, true)
+	mongo, _ := SetupTest(t, true, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -336,7 +343,7 @@ func Test_ItForbidsCreateIfNotAuthenticated(t *testing.T) {
 }
 
 func Test_ItReturnsPrexistingIdIfRequestAlreadyExists(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -358,7 +365,7 @@ func Test_ItReturnsPrexistingIdIfRequestAlreadyExists(t *testing.T) {
 }
 
 func Test_ItRejectsRequestsThatDontHaveAClientRequestId(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -374,7 +381,7 @@ func Test_ItRejectsRequestsThatDontHaveAClientRequestId(t *testing.T) {
 }
 
 func Test_ItRejectsRequestsThatHaveAnEmptyClientRequestId(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -392,7 +399,7 @@ func Test_ItRejectsRequestsThatHaveAnEmptyClientRequestId(t *testing.T) {
 }
 
 func Test_ItRejectsAMessageThatHasMissingChannel(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -435,7 +442,7 @@ func Test_ItRejectsAMessageThatHasMissingChannel(t *testing.T) {
 }
 
 func Test_ItRejectsAMessageThatHasEmptyChannel(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -479,7 +486,7 @@ func Test_ItRejectsAMessageThatHasEmptyChannel(t *testing.T) {
 }
 
 func Test_ItRejectsAMessageThatHasMissingFieldName(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -523,7 +530,7 @@ func Test_ItRejectsAMessageThatHasMissingFieldName(t *testing.T) {
 }
 
 func Test_ItRejectsAMessageThatHasMissingFieldValue(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -567,7 +574,7 @@ func Test_ItRejectsAMessageThatHasMissingFieldValue(t *testing.T) {
 }
 
 func Test_ItDoesAHealthCheck(t *testing.T) {
-	mongo, _ := SetupTest(t, false)
+	mongo, _ := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -580,8 +587,22 @@ func Test_ItDoesAHealthCheck(t *testing.T) {
 	assert.Equal(t, resp.Status, pb_health.HealthCheckResponse_SERVING)
 }
 
+func Test_ItDoesAFailedHealthCheck(t *testing.T) {
+	mongo, _ := SetupTest(t, false, false)
+	defer mongo.tearDown()
+
+	grpcClient := setupGrpcClient()
+	defer grpcClient.close()
+
+	client := pb_health.NewHealthClient(grpcClient.conn)
+
+	resp, err := client.Check(context.Background(), &pb_health.HealthCheckRequest{})
+	assert.Nil(t, err)
+	assert.Equal(t, resp.Status, pb_health.HealthCheckResponse_NOT_SERVING)
+}
+
 func Test_ItDoesAHealthCheckIfUnauthenticated(t *testing.T) {
-	mongo, _ := SetupTest(t, true)
+	mongo, _ := SetupTest(t, true, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -595,7 +616,7 @@ func Test_ItDoesAHealthCheckIfUnauthenticated(t *testing.T) {
 }
 
 func Test_ItUpdatesAMessage(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -663,7 +684,7 @@ func Test_ItUpdatesAMessage(t *testing.T) {
 }
 
 func Test_ItUpdatesAMessageWithNoContent(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -731,7 +752,7 @@ func Test_ItUpdatesAMessageWithNoContent(t *testing.T) {
 }
 
 func Test_ItUpdatesAMessageIfAuthenticated(t *testing.T) {
-	mongo, _ := SetupTest(t, true)
+	mongo, _ := SetupTest(t, true, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -785,7 +806,7 @@ func Test_ItUpdatesAMessageIfAuthenticated(t *testing.T) {
 }
 
 func Test_ItRejectsAMessageIfNotAuthenticated(t *testing.T) {
-	mongo, _ := SetupTest(t, true)
+	mongo, _ := SetupTest(t, true, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -835,7 +856,7 @@ func Test_ItRejectsAMessageIfNotAuthenticated(t *testing.T) {
 }
 
 func Test_ItDoesntUpdateAMessageNotFound(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -856,7 +877,7 @@ func Test_ItDoesntUpdateAMessageNotFound(t *testing.T) {
 }
 
 func Test_ItDoesntUpdateAMessageNoIdSpecified(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -877,7 +898,7 @@ func Test_ItDoesntUpdateAMessageNoIdSpecified(t *testing.T) {
 }
 
 func Test_ItRejectsAnUpdateThatHasMissingFieldName(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -924,7 +945,7 @@ func Test_ItRejectsAnUpdateThatHasMissingFieldName(t *testing.T) {
 }
 
 func Test_ItRejectsAnUpdateThatHasMissingFieldValue(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -971,7 +992,7 @@ func Test_ItRejectsAnUpdateThatHasMissingFieldValue(t *testing.T) {
 }
 
 func Test_ItDoesntUpdateAMessageClientRequestIdEmpty(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -992,7 +1013,7 @@ func Test_ItDoesntUpdateAMessageClientRequestIdEmpty(t *testing.T) {
 }
 
 func Test_ItDoesntUpdateAMessageClientRequestIdMissing(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
@@ -1011,7 +1032,7 @@ func Test_ItDoesntUpdateAMessageClientRequestIdMissing(t *testing.T) {
 }
 
 func Test_ItCanCreateThenUpdateAMessage(t *testing.T) {
-	mongo, scheduler := SetupTest(t, false)
+	mongo, scheduler := SetupTest(t, false, true)
 	defer mongo.tearDown()
 
 	grpcClient := setupGrpcClient()
