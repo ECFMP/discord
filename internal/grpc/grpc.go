@@ -165,10 +165,8 @@ func (server *server) Update(ctx context.Context, in *pb_discord.UpdateRequest) 
  * Implements the Check method of the HealthServer interface
  */
 func (server *server) Check(ctx context.Context, in *pb_health.HealthCheckRequest) (*pb_health.HealthCheckResponse, error) {
-	mongoPingErr := server.mongo.Ping()
-	if mongoPingErr != nil {
-		log.Errorf("Failed to ping mongo: %v", mongoPingErr)
-		return nil, status.Error(codes.Unavailable, "Failed to ping mongo")
+	if !server.scheduler.Ready() {
+		return &pb_health.HealthCheckResponse{Status: pb_health.HealthCheckResponse_NOT_SERVING}, nil
 	}
 
 	return &pb_health.HealthCheckResponse{Status: pb_health.HealthCheckResponse_SERVING}, nil

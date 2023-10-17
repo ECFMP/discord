@@ -36,13 +36,6 @@ func NewMongo() (*Mongo, error) {
 		return nil, err
 	}
 
-	// Ping mongo
-	pingErr := client.Ping(ctx, nil)
-	if pingErr != nil {
-		log.Errorf("Failed to ping mongo: %v", pingErr)
-		return nil, pingErr
-	}
-
 	// Create necessary indexes in mongo
 	collection := client.Database(os.Getenv("MONGO_DB")).Collection("discord_messages")
 	_, indexErr := collection.Indexes().CreateOne(
@@ -244,15 +237,6 @@ func (m *Mongo) GetDiscordMessageByClientRequestId(clientRequestId string) (*Dis
 	}
 
 	return &result, nil
-}
-
-/**
- * Pings the mongo database to check if it is up.
- */
-func (m *Mongo) Ping() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	return m.Client.Ping(ctx, nil)
 }
 
 /**
