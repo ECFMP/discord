@@ -23,17 +23,14 @@ type Mongo struct {
  * Create a new mongo connection
  */
 func NewMongo() (*Mongo, error) {
-	mongoUri := fmt.Sprintf(
-		"mongodb://%s:%s@%s:%s",
-		os.Getenv("MONGO_USERNAME"),
-		os.Getenv("MONGO_PASSWORD"),
-		os.Getenv("MONGO_HOST"),
-		os.Getenv("MONGO_PORT"),
-	)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoUri), options.Client().SetMaxPoolSize(10), options.Client().SetMaxConnIdleTime(5*time.Second))
+
+	auth := options.Credential{
+		Username: os.Getenv("MONGO_USERNAME"),
+		Password: os.Getenv("MONGO_PASSWORD"),
+	}
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(os.Getenv("MONGO_HOST")).SetAuth(auth).SetMaxPoolSize(10).SetMaxConnIdleTime(5*time.Second))
 	if err != nil {
 		log.Errorf("Failed to connect to mongo: %v", err)
 		return nil, err
