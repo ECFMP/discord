@@ -17,7 +17,7 @@ FROM builder_base AS development
 EXPOSE 80
 
 # Health check
-HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 CMD [ "grpc_health_probe", "-addr", "localhost:80", "-connect-timeout", "250ms", "-rpc-timeout", "100ms" ]
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 CMD [ "grpc_health_probe", "-addr", "localhost:80", "-connect-timeout", "100ms", "-rpc-timeout", "250ms" ]
 
 # Create the user
 RUN adduser --uid 1000 appuser
@@ -77,7 +77,7 @@ COPY --from=builder_base /usr/local/bin/grpc_health_probe /usr/local/bin/grpc_he
 EXPOSE 80
 
 # Health check
-HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 CMD [ "grpc_health_probe", "-addr", "localhost:80", "-connect-timeout", "250ms", "-rpc-timeout", "100ms" ]
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 CMD [ "grpc_health_probe", "-addr", "localhost:80", "-connect-timeout", "100ms", "-rpc-timeout", "250ms" ]
 
 USER appuser
 

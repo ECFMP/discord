@@ -9,12 +9,14 @@ import (
 
 type Scheduler interface {
 	ScheduleMessage(id string)
+	Ready() bool
 }
 
 type DiscordScheduler struct {
 	channel chan string
 	mongo   *db.Mongo
 	discord Discord
+	ready bool
 
 	GoRoutineWaitGroup *sync.WaitGroup
 }
@@ -27,10 +29,12 @@ func NewDiscordScheduler(mongo *db.Mongo, discordInterface Discord) *DiscordSche
 		mongo:              mongo,
 		discord:            discordInterface,
 		channel:            make(chan string, 50),
+		ready:     false,
 		GoRoutineWaitGroup: &sync.WaitGroup{},
 	}
 
 	go func(schedulerToProcess *DiscordScheduler) {
+		schedulerToProcess.ready = true
 		schedulerToProcess.processChannel()
 	}(scheduler)
 
@@ -44,6 +48,10 @@ func (d *DiscordScheduler) ScheduleMessage(id string) {
 	log.Infof("Scheduler: Scheduling message with id %v", id)
 	d.GoRoutineWaitGroup.Add(1)
 	d.channel <- id
+}
+
+func (d *DiscordScheduler) Ready() bool {
+	return d.ready
 }
 
 /**

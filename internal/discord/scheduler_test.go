@@ -7,6 +7,7 @@ import (
 	pb "ecfmp/discord/proto/discord/gen/pb-go/ecfmp.vatsim.net/grpc/discord"
 	"os"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -126,4 +127,22 @@ func Test_ItUpdatesMessagesFromVersions(t *testing.T) {
 	}
 
 	assert.Equal(t, "some-client-request-id", mongoMessage.LastClientRequestPublished)
+}
+
+func Test_ItReturnsReadyStatus(t *testing.T) {
+	testMongo, _, scheduler := SetupTest(t)
+	defer testMongo.tearDown()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	for {
+		if ctx.Err() != nil {
+			t.Errorf("Timed out waiting for scheduler to be ready")
+			break
+		}
+
+		if scheduler.Ready() {
+			break
+		}
+	}
 }
