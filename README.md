@@ -22,3 +22,7 @@ A devcontainer setup is provided for development.
 
 Tests can be run using `make test`, which will run the tests in the main container. If you're in the dev container, you can run the tests
 by running `go test -v ./...`.
+
+# Integrating
+
+For how to integrate with this service, check out [ECFMP's protobuf repo](https://github.com/ECFMP/ecfmp-protobuf), which contains the protocol.
