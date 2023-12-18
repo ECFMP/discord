@@ -54,18 +54,25 @@ func main() {
 	// Create the discord scheduler
 	scheduler := discord.NewDiscordScheduler(mongo, publisher)
 
-	// Get the public key from the environment
-	publicKeyFile := os.Getenv("AUTH_JWT_PUBLIC_KEY_FILE")
-	if publicKeyFile == "" {
-		log.Fatalf("AUTH_JWT_PUBLIC_KEY_FILE is not set")
-	}
+	// Try the public key from the environment directly
+	publicKey := os.Getenv("AUTH_JWT_PUBLIC_KEY")
 
-	// Get the public key by reading the file, throw error if file doesnt exist
-	publicKey, err := os.ReadFile(publicKeyFile)
-	if err != nil {
-		log.Fatalf("failed to read public key file: %v", err)
+	// If the public key is empty, try to get it from a file
+	if publicKey == "" {
+		publicKeyFile := os.Getenv("AUTH_JWT_PUBLIC_KEY_FILE")
+		if publicKeyFile == "" {
+			log.Fatalf("AUTH_JWT_PUBLIC_KEY_FILE is not set")
+		}
+
+		// Get the public key by reading the file, throw error if file doesnt exist
+		fromFile, err := os.ReadFile(publicKeyFile)
+		if err != nil {
+			log.Fatalf("failed to read public key file: %v", err)
+		}
+
+		publicKey = string(fromFile)
 	}
-	interceptor := grpc.NewJwtAuthInterceptor(publicKey, os.Getenv("AUTH_JWT_AUDIENCE"))
+	interceptor := grpc.NewJwtAuthInterceptor([]byte(publicKey), os.Getenv("AUTH_JWT_AUDIENCE"))
 
 	grpcServer := grpc.NewServer(mongo, scheduler, interceptor)
 	log.Info("Discord server starting...")
