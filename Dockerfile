@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Install gRPC Health Probe
 RUN set -ex \
-    && curl -fSL https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.19/grpc_health_probe-$TARGETOS-$TARGETARCH -o /usr/local/bin/grpc_health_probe \
+    && curl -fSL "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.19/grpc_health_probe-$TARGETOS-$TARGETARCH -o /usr/local/bin/grpc_health_probe" \
     && chmod +x /usr/local/bin/grpc_health_probe
 
 #######################################################
