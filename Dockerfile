@@ -2,11 +2,15 @@
 ARG GO_VERSION
 FROM golang:${GO_VERSION} AS builder_base
 
+# Needed to get the right grpc_health_probe binary
+ARG TARGETOS
+ARG TARGETARCH
+
 WORKDIR /app
 
 # Install gRPC Health Probe
 RUN set -ex \
-    && curl -fSL https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.19/grpc_health_probe-linux-amd64 -o /usr/local/bin/grpc_health_probe \
+    && curl -fSL "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.19/grpc_health_probe-${TARGETOS}-${TARGETARCH}" -o /usr/local/bin/grpc_health_probe \
     && chmod +x /usr/local/bin/grpc_health_probe
 
 #######################################################
@@ -49,7 +53,7 @@ ENTRYPOINT [ "./docker/test-container.sh" ]
 # Builds the production binary
 FROM golang:${GO_VERSION}-alpine AS builder_production
 
-WORKDIR /app 
+WORKDIR /app
 
 # Go dependencies
 COPY go.mod go.sum ./
