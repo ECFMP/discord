@@ -1,5 +1,7 @@
 # Base stage, sets up the GRPC Health Probe, we use a ubuntu image because no devcontainer features work on alpine
 ARG GO_VERSION
+ARG TARGETOS
+ARG TARGETARCH
 FROM golang:${GO_VERSION} AS builder_base
 
 WORKDIR /app
